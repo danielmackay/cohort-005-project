@@ -31,3 +31,4 @@
 # Generated reports. Each file is local to one machine.
 reports/
 
+.playwright-mcp/
