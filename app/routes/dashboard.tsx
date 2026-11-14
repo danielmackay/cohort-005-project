@@ -8,6 +8,7 @@ import {
   lessons,
   lessonProgress,
   LessonProgressStatus,
+  EnrollmentStatus,
 } from "~/db/schema";
 import { eq, and, or, sql } from "drizzle-orm";
 import { getCurrentUserId } from "~/lib/session";
@@ -32,7 +33,12 @@ function getUserEnrolledCourses(userId: number) {
     })
     .from(enrollments)
     .innerJoin(courses, eq(enrollments.courseId, courses.id))
-    .where(eq(enrollments.userId, userId))
+    .where(
+      and(
+        eq(enrollments.userId, userId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .all();
 }
 

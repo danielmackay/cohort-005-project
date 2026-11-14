@@ -7,6 +7,7 @@ import {
   courses,
   enrollments,
   purchases,
+  EnrollmentStatus,
 } from "~/db/schema";
 import { getCurrentUserId } from "~/lib/session";
 import { resolveCountry } from "~/lib/country.server";
@@ -30,8 +31,10 @@ function findEnrollment(userId: number, courseId: number) {
     .get();
 }
 
+// A Refunded Enrollment is kept (with the student's progress) but gives no
+// access. See docs/adr/0001-refund-ends-access-but-keeps-progress.md.
 function isUserEnrolled(userId: number, courseId: number) {
-  return !!findEnrollment(userId, courseId);
+  return findEnrollment(userId, courseId)?.status === EnrollmentStatus.Active;
 }
 
 function findPurchase(userId: number, courseId: number) {

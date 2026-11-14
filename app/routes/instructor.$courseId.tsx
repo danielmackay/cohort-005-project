@@ -9,7 +9,7 @@ import {
 } from "@hello-pangea/dnd";
 import type { Route } from "./+types/instructor.$courseId";
 import { getCurrentUserId } from "~/lib/session";
-import { CourseStatus, UserRole } from "~/db/schema";
+import { CourseStatus, EnrollmentStatus, UserRole } from "~/db/schema";
 import { db } from "~/db";
 import {
   courses,
@@ -360,7 +360,12 @@ function getEnrollmentCountForCourse(courseId: number) {
   const result = db
     .select({ count: sql<number>`count(*)` })
     .from(enrollments)
-    .where(eq(enrollments.courseId, courseId))
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .get();
 
   return result?.count ?? 0;
@@ -375,7 +380,12 @@ function getCourseEnrolledStudents(courseId: number) {
       completedAt: enrollments.completedAt,
     })
     .from(enrollments)
-    .where(eq(enrollments.courseId, courseId))
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .all();
 }
 

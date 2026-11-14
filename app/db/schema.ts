@@ -37,6 +37,18 @@ export enum RefundStatus {
   Declined = "declined",
 }
 
+// The money side of an Approved Refund Request.
+export enum RefundState {
+  Pending = "pending",
+  Issued = "issued",
+  Failed = "failed",
+}
+
+export enum EnrollmentStatus {
+  Active = "active",
+  Refunded = "refunded",
+}
+
 export enum TeamMemberRole {
   Admin = "admin",
   Member = "member",
@@ -128,6 +140,10 @@ export const enrollments = sqliteTable(
     courseId: integer("course_id")
       .notNull()
       .references(() => courses.id),
+    status: text("status")
+      .notNull()
+      .$type<EnrollmentStatus>()
+      .default(EnrollmentStatus.Active),
     enrolledAt: text("enrolled_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -240,10 +256,14 @@ export const refunds = sqliteTable(
       .notNull()
       .$type<RefundStatus>()
       .default(RefundStatus.Open),
-    // The learner's own words, in the box on the course page.
+    // The student's own words, in the box on the course page.
     reason: text("reason").notNull(),
     // Null until someone approves — a declined request refunds nothing.
     amountRefunded: integer("amount_refunded"),
+    // Null until approved; then where the money is.
+    refundState: text("refund_state").$type<RefundState>(),
+    // The Admin's explanation, shown to the student. Only on declined requests.
+    declineReason: text("decline_reason"),
     requestedAt: text("requested_at")
       .notNull()
       .$defaultFn(() => new Date().toISOString()),
@@ -288,6 +308,8 @@ export const coupons = sqliteTable("coupons", {
     .references(() => purchases.id),
   redeemedByUserId: integer("redeemed_by_user_id").references(() => users.id),
   redeemedAt: text("redeemed_at"),
+  // Set when the purchase was refunded before this seat was claimed.
+  voidedAt: text("voided_at"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

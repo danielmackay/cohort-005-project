@@ -21,6 +21,7 @@ import { alias, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { db } from "~/db";
 import {
   CourseStatus,
+  EnrollmentStatus,
   LessonProgressStatus,
   UserRole,
   comments,
@@ -364,7 +365,13 @@ function getTopBuyers(
       .selectDistinct({ userId: enrollments.userId })
       .from(enrollments)
       .innerJoin(courses, eq(enrollments.courseId, courses.id))
-      .where(and(inArray(enrollments.userId, buyerIds), ownedBy(instructorId)))
+      .where(
+        and(
+          inArray(enrollments.userId, buyerIds),
+          eq(enrollments.status, EnrollmentStatus.Active),
+          ownedBy(instructorId)
+        )
+      )
       .all()
       .map((row) => row.userId)
   );
@@ -392,7 +399,19 @@ function getRatingSummary(
     })
     .from(courseRatings)
     .innerJoin(courses, eq(courseRatings.courseId, courses.id))
-    .where(scopeOn(courseRatings.createdAt, instructorId, range))
+    .innerJoin(
+      enrollments,
+      and(
+        eq(enrollments.userId, courseRatings.userId),
+        eq(enrollments.courseId, courseRatings.courseId)
+      )
+    )
+    .where(
+      and(
+        scopeOn(courseRatings.createdAt, instructorId, range),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .get();
 
   if (!row || row.count === 0 || row.average === null) {
@@ -508,7 +527,12 @@ function getCourseProgressSummary(courseId: number): CourseProgressSummary {
         inArray(lessonProgress.lessonId, courseLessonIds(courseId))
       )
     )
-    .where(eq(enrollments.courseId, courseId))
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .groupBy(enrollments.userId)
     .all();
 
@@ -546,7 +570,12 @@ function getCourseDropOff(courseId: number): CourseFunnel {
   const enrolled = db
     .select({ enrolledCount: countDistinct(enrollments.userId) })
     .from(enrollments)
-    .where(eq(enrollments.courseId, courseId))
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .get();
 
   const enrolledCount = enrolled?.enrolledCount ?? 0;
@@ -583,7 +612,8 @@ function getCourseDropOff(courseId: number): CourseFunnel {
       enrollments,
       and(
         eq(enrollments.userId, lessonProgress.userId),
-        eq(enrollments.courseId, courseId)
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
       )
     )
     .where(

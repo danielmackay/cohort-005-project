@@ -20,6 +20,7 @@ import {
   videoWatchEvents,
   LessonProgressStatus,
   RefundStatus,
+  EnrollmentStatus,
 } from "~/db/schema";
 import { eq, and, or, sql, inArray, isNotNull } from "drizzle-orm";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
@@ -55,6 +56,7 @@ import {
 } from "~/lib/ppp";
 import { parseFormData } from "~/lib/validation";
 import { MAX_RATING, MIN_RATING } from "~/lib/ratings";
+import { hasHadRefund } from "~/lib/refunds.server";
 import { StarRating, StarRatingInput } from "~/components/star-rating";
 
 function getCourseBySlug(slug: string) {
@@ -141,7 +143,11 @@ function isUserEnrolled(userId: number, courseId: number) {
     .select()
     .from(enrollments)
     .where(
-      and(eq(enrollments.userId, userId), eq(enrollments.courseId, courseId))
+      and(
+        eq(enrollments.userId, userId),
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
     )
     .get();
   return !!enrollment;
@@ -318,7 +324,19 @@ function getCourseRatingSummary(courseId: number): CourseRatingSummary {
       count: sql<number>`count(*)`,
     })
     .from(courseRatings)
-    .where(eq(courseRatings.courseId, courseId))
+    .innerJoin(
+      enrollments,
+      and(
+        eq(enrollments.userId, courseRatings.userId),
+        eq(enrollments.courseId, courseRatings.courseId)
+      )
+    )
+    .where(
+      and(
+        eq(courseRatings.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .get();
 
   if (!result || result.count === 0 || result.average === null) {
@@ -440,7 +458,7 @@ function asDayString(when: Date) {
 }
 
 /**
- * What the learner is offered if they want their money back, or null if this
+ * What the student is offered if they want their money back, or null if this
  * purchase cannot be refunded.
  */
 function getRefundOffer(userId: number, course: { id: number }) {
@@ -448,6 +466,7 @@ function getRefundOffer(userId: number, course: { id: number }) {
 
   if (!purchase) return null;
   if (getOpenRefundRequest(purchase.id)) return null;
+  if (hasHadRefund(db, userId, course.id)) return null;
 
   const purchasedDay = asDayString(new Date(purchase.createdAt));
   const windowEnd = new Date(purchase.createdAt);

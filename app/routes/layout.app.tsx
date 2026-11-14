@@ -5,7 +5,7 @@ import { DevUI } from "~/components/dev-ui";
 import { Toaster } from "sonner";
 import { getCurrentUserId, getDevCountry } from "~/lib/session";
 import { getCountryTierInfo, COUNTRIES } from "~/lib/ppp";
-import { eq, and, or, sql, desc } from "drizzle-orm";
+import { eq, and, or, sql, desc, isNull, ne } from "drizzle-orm";
 import { db } from "~/db";
 import {
   users,
@@ -17,6 +17,8 @@ import {
   teamMembers,
   TeamMemberRole,
   LessonProgressStatus,
+  enrollments,
+  EnrollmentStatus,
 } from "~/db/schema";
 
 function getAllUsers() {
@@ -164,7 +166,25 @@ function getRecentlyProgressedCourses(userId: number, limit: number = 3) {
     .innerJoin(lessons, eq(lessonProgress.lessonId, lessons.id))
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
-    .where(eq(lessonProgress.userId, userId))
+    // Progress on a refunded course is kept but hidden. Staff can have
+    // progress without an Enrollment, so exclude refunded rather than
+    // requiring active.
+    .leftJoin(
+      enrollments,
+      and(
+        eq(enrollments.userId, lessonProgress.userId),
+        eq(enrollments.courseId, courses.id)
+      )
+    )
+    .where(
+      and(
+        eq(lessonProgress.userId, userId),
+        or(
+          isNull(enrollments.status),
+          ne(enrollments.status, EnrollmentStatus.Refunded)
+        )
+      )
+    )
     .groupBy(courses.id)
     .orderBy(desc(sql`max(${lessonProgress.id})`))
     .limit(limit)

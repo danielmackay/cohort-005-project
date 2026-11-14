@@ -15,7 +15,7 @@ import {
   users,
   TeamMemberRole,
 } from "~/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 
 function getTeamForAdmin(userId: number) {
   const membership = db
@@ -34,8 +34,13 @@ function getTeamForAdmin(userId: number) {
   return db.select().from(teams).where(eq(teams.id, membership.teamId)).get();
 }
 
+// A Voided Seat Coupon is no longer a seat, so the team page leaves it out.
 function getCouponsForTeam(teamId: number) {
-  return db.select().from(coupons).where(eq(coupons.teamId, teamId)).all();
+  return db
+    .select()
+    .from(coupons)
+    .where(and(eq(coupons.teamId, teamId), isNull(coupons.voidedAt)))
+    .all();
 }
 
 function getCourseById(id: number) {

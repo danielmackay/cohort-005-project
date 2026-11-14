@@ -11,7 +11,14 @@ import { Button } from "~/components/ui/button";
 import { Ticket, AlertCircle, CheckCircle2, Globe } from "lucide-react";
 import { data } from "react-router";
 import { db } from "~/db";
-import { purchases, coupons, courses, enrollments } from "~/db/schema";
+import {
+  purchases,
+  coupons,
+  courses,
+  enrollments,
+  EnrollmentStatus,
+} from "~/db/schema";
+import { enrollStudent } from "~/lib/refunds.server";
 import { eq, and } from "drizzle-orm";
 
 function getCourseById(id: number) {
@@ -31,7 +38,7 @@ function isUserEnrolled(userId: number, courseId: number) {
     )
     .get();
 
-  return !!existing;
+  return existing?.status === EnrollmentStatus.Active;
 }
 
 type RedeemResult =
@@ -52,18 +59,14 @@ function redeemCoupon(
     return { ok: false, error: "Coupon has already been redeemed" };
   }
 
-  const existingEnrollment = db
-    .select()
-    .from(enrollments)
-    .where(
-      and(
-        eq(enrollments.userId, userId),
-        eq(enrollments.courseId, coupon.courseId)
-      )
-    )
-    .get();
+  if (coupon.voidedAt !== null) {
+    return {
+      ok: false,
+      error: "This seat was cancelled because its purchase was refunded",
+    };
+  }
 
-  if (existingEnrollment) {
+  if (isUserEnrolled(userId, coupon.courseId)) {
     return { ok: false, error: "You are already enrolled in this course" };
   }
 
@@ -89,11 +92,7 @@ function redeemCoupon(
     .where(eq(coupons.id, coupon.id))
     .run();
 
-  const enrollment = db
-    .insert(enrollments)
-    .values({ userId, courseId: coupon.courseId })
-    .returning()
-    .get();
+  const enrollment = enrollStudent(db, userId, coupon.courseId);
 
   return { ok: true, enrollment };
 }
@@ -135,11 +134,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const alreadyRedeemed = coupon.redeemedByUserId !== null;
+  const voided = coupon.voidedAt !== null;
   const alreadyEnrolled = isUserEnrolled(currentUserId, coupon.courseId);
 
   // Check country mismatch upfront so we can show a clear message
   let countryMismatch = false;
-  if (!alreadyRedeemed && !alreadyEnrolled) {
+  if (!alreadyRedeemed && !voided && !alreadyEnrolled) {
     const userCountry = await resolveCountry(request);
     const purchase = db
       .select()
@@ -155,6 +155,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     course: { id: course.id, title: course.title, slug: course.slug },
     code,
     alreadyRedeemed,
+    voided,
     alreadyEnrolled,
     countryMismatch,
   };
@@ -194,8 +195,14 @@ export default function Redeem({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { course, code, alreadyRedeemed, alreadyEnrolled, countryMismatch } =
-    loaderData;
+  const {
+    course,
+    code,
+    alreadyRedeemed,
+    voided,
+    alreadyEnrolled,
+    countryMismatch,
+  } = loaderData;
   const fetcher = useFetcher();
   const isSubmitting = fetcher.state !== "idle";
 
@@ -208,7 +215,8 @@ export default function Redeem({
   }, [fetcher.data, actionData]);
 
   // Determine which state to show
-  const canRedeem = !alreadyRedeemed && !alreadyEnrolled && !countryMismatch;
+  const canRedeem =
+    !alreadyRedeemed && !voided && !alreadyEnrolled && !countryMismatch;
 
   return (
     <div className="mx-auto max-w-2xl p-6 lg:p-8">
@@ -240,6 +248,17 @@ export default function Redeem({
               <p className="mt-2 text-sm text-muted-foreground">
                 Someone has already claimed this seat. Please ask the person who
                 shared this link for a new coupon.
+              </p>
+            </div>
+          ) : voided ? (
+            <div className="rounded-lg bg-destructive/10 p-4">
+              <div className="flex items-center justify-center gap-2 text-destructive">
+                <AlertCircle className="size-5" />
+                <span className="font-medium">This seat was cancelled</span>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                The purchase this seat came from was refunded, so it can no
+                longer be claimed.
               </p>
             </div>
           ) : alreadyEnrolled ? (

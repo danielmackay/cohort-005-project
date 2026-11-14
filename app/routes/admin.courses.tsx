@@ -8,6 +8,7 @@ import { parseFormData } from "~/lib/validation";
 import {
   UserRole,
   CourseStatus,
+  EnrollmentStatus,
   courses,
   modules,
   lessons,
@@ -15,7 +16,7 @@ import {
   users,
 } from "~/db/schema";
 import { db } from "~/db";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -67,7 +68,12 @@ function getEnrollmentCountForCourse(courseId: number) {
   const result = db
     .select({ count: sql<number>`count(*)` })
     .from(enrollments)
-    .where(eq(enrollments.courseId, courseId))
+    .where(
+      and(
+        eq(enrollments.courseId, courseId),
+        eq(enrollments.status, EnrollmentStatus.Active)
+      )
+    )
     .get();
 
   return result?.count ?? 0;

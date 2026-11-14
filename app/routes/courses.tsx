@@ -12,6 +12,7 @@ import {
   courseRatings,
   CourseStatus,
   LessonProgressStatus,
+  EnrollmentStatus,
 } from "~/db/schema";
 import { eq, like, and, or, sql, inArray } from "drizzle-orm";
 import { Card, CardContent, CardFooter, CardHeader } from "~/components/ui/card";
@@ -127,7 +128,12 @@ function getUserEnrolledCourses(userId: number) {
     })
     .from(enrollmentsTable)
     .innerJoin(coursesTable, eq(enrollmentsTable.courseId, coursesTable.id))
-    .where(eq(enrollmentsTable.userId, userId))
+    .where(
+      and(
+        eq(enrollmentsTable.userId, userId),
+        eq(enrollmentsTable.status, EnrollmentStatus.Active)
+      )
+    )
     .all();
 }
 
@@ -251,7 +257,19 @@ function getCourseRatingSummaries(
       count: sql<number>`count(*)`,
     })
     .from(courseRatings)
-    .where(inArray(courseRatings.courseId, courseIds))
+    .innerJoin(
+      enrollmentsTable,
+      and(
+        eq(enrollmentsTable.userId, courseRatings.userId),
+        eq(enrollmentsTable.courseId, courseRatings.courseId)
+      )
+    )
+    .where(
+      and(
+        inArray(courseRatings.courseId, courseIds),
+        eq(enrollmentsTable.status, EnrollmentStatus.Active)
+      )
+    )
     .groupBy(courseRatings.courseId)
     .all();
 
