@@ -1,17 +1,28 @@
 # Cadence
 
-Cadence sells video courses to learners. This glossary covers the language around buying courses and getting money back after a purchase.
+Cadence sells video courses to students. This glossary covers the language around buying courses, getting money back, and who has a place on a course.
 
 ## Language
 
 ### People
+
+**Student**:
+A person who buys or takes a course.
+_Avoid_: Learner, User
+
+**Lapsed**:
+A Student who once had a place on a course but no longer does, for example after an Approved Refund Request.
+
+**Instructor**:
+Speaks for their own courses only. An Instructor builds and edits the courses they own, and sees the Students on them.
+_Avoid_: Teacher, Author, Creator
 
 **Platform Admin**:
 A member of Cadence staff who runs the platform. Only a Platform Admin decides Refund Requests.
 _Avoid_: Admin (on its own), the team, Staff
 
 **Team Admin**:
-A learner who buys and manages a Team Licence. A Team Admin has no say over Refund Requests.
+A Student who buys and manages a Team Licence. A Team Admin has no say over Refund Requests.
 _Avoid_: Admin (on its own)
 
 ### Purchases
@@ -21,21 +32,21 @@ A single payment for a course. It is either an Individual Purchase or a Team Lic
 _Avoid_: Order, Transaction
 
 **Individual Purchase**:
-A Purchase a learner makes for themselves. It gives the buyer the course.
+A Purchase a Student makes for themselves. It gives the buyer the course.
 
 **Team Licence**:
 A Purchase a Team Admin makes for others. It grants Seats, not the course itself; the buyer can't watch the course through it.
 _Avoid_: Team purchase, Bulk purchase
 
 **Seat**:
-One place on a Team Licence that a learner can claim to get the course.
+One place on a Team Licence that a Student can claim to get the course.
 _Avoid_: Coupon, Code, Voucher
 
 **Unclaimed Seat**:
-A Seat no learner has claimed yet.
+A Seat no Student has claimed yet.
 
 **Claimed Seat**:
-A Seat a learner has claimed. It belongs to that learner, so a Team Licence with any Claimed Seat can't be refunded.
+A Seat a Student has claimed. It belongs to that Student, so a Team Licence with any Claimed Seat can't be refunded.
 
 ### Refunds
 
@@ -68,46 +79,10 @@ _Avoid_: Completed, Paid out
 **Failed Refund**:
 A Refund where the money couldn't be sent. The Refund Request stays approved, because the decision hasn't changed.
 
-### Other terms
+**Watched**:
+Seconds of video a Student has actually played in a course: the furthest point reached in each lesson, added up. Not lessons opened.
+_Avoid_: Viewed, Progress
 
 **Watch Limit**:
-A Refund is only offered on a course with under two hours watched. Past that, the Learner has had the course, and the refund form turns them away.
+The most Watched time a Student can have on a course and still get a Refund.
 _Avoid_: Watch cap, Viewing threshold
-
-**Refunds table**:
-`refunds` — one row per Refund. Columns: `id`, `purchase_id`, `status` (`open`, `approved`, `declined`), `reason`, `amount_refunded`, `requested_at`, `resolved_at`, `resolved_by_user_id`, `decision_note`.
-
-**refunded_at**:
-Nullable text column on `coupons`. An ISO timestamp, set on every unclaimed coupon when its team purchase is refunded. `getSeatAvailability` returns `"refunded"` for it.
-
-**resolved_by_user_id**:
-Integer column on `refunds`, referencing `users.id`. Null until an Admin approves or declines the Refund.
-
-**RefundRequestCard**:
-The component that draws one Refund Request on `/admin/refunds`, with its Approve and Decline buttons.
-
-**Button**:
-A clickable element that fires an action when the user presses it. Built on `~/components/ui/button`.
-
-**Component**:
-A React function that returns JSX.
-
-**cwd**:
-The directory the dev server was started from. Paths in `scripts/` resolve from here.
-
-**Loader**:
-The React Router function that fetches a route's data on the server before the page renders.
-
-**Slug**:
-The URL-safe name of a course, as in `/courses/:slug`.
-
-**Lapsed**:
-An Enrollment that is no longer active. Shown as a badge on the instructor's student roster.
-
-**Instructor**:
-Speaks for their own courses only. An Instructor builds and edits the courses they own, and sees the learners enrolled on them.
-_Avoid_: Teacher, Author, Creator
-
-**Watched**:
-Seconds of video a Learner has actually played in a course: the furthest point reached in each lesson, added up. Not lessons opened.
-_Avoid_: Viewed, Progress
