@@ -1,4 +1,10 @@
+---
+status: deprecated
+---
+
 # Look up a buyer's country with ip-api.com when the request does not carry one
+
+> **Deprecated 2026-11-14.** `resolveCountry` no longer calls ip-api.com. An unknown country now pays full price, so a page never waits on a network call. See `app/lib/country.server.ts`.
 
 Purchasing-power prices depend on the buyer's country. Behind Cloudflare the request carries it in the `CF-IPCountry` header, but not every request comes through Cloudflare. When the header is missing, `resolveCountry` looks up the first `X-Forwarded-For` address on ip-api.com's free endpoint, and only falls back to full price if that lookup fails.
 

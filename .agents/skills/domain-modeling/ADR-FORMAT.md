@@ -26,6 +26,15 @@ Only include these when they add genuine value. Most ADRs won't need them.
 
 Scan `docs/adr/` for the highest existing number and increment by one.
 
+## Retiring an ADR
+
+Never delete an ADR, and never renumber. Code links to ADRs by number. Retire an ADR in one of two ways:
+
+- **Superseded**: a new decision replaces it, and that decision passes the three tests below on its own. Write the new ADR, then set `status: superseded by ADR-NNNN` on the old one.
+- **Deprecated**: the decision no longer holds, or it was never worth an ADR. Set `status: deprecated`.
+
+Either way, put a dated one-line note under the title saying what changed and where the code is now, and leave the original body untouched. Retired ADRs stay in `docs/adr/`.
+
 ## When to offer an ADR
 
 All three of these must be true:
