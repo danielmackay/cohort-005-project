@@ -900,12 +900,31 @@ export async function action({ params, request }: Route.ActionArgs) {
         if (!parsed.success) {
           return { ok: false, error: "Enter a comment before posting." };
         }
-        createComment(
+        const created = createComment(
           currentUserId,
           lessonId,
           parsed.data.parentId ?? null,
           parsed.data.body
         );
+        // PROTOTYPE (ticket #26): Discussion Reply → question author, via Knock.
+        // Inline and awaited on purpose; where triggers really live is a later ticket.
+        if (created.parentId !== null) {
+          const question = getCommentById(created.parentId)!;
+          if (question.userId !== currentUserId) {
+            const byId = (id: number) =>
+              db.select().from(users).where(eq(users.id, id)).get()!;
+            const { notifyDiscussionReply } = await import(
+              "~/prototype/knock.server"
+            );
+            await notifyDiscussionReply({
+              replier: byId(currentUserId),
+              questionAuthor: byId(question.userId),
+              lessonTitle: getLessonById(lessonId)?.title ?? "a lesson",
+              lessonUrl: `/courses/${slug}/lessons/${lessonId}`,
+              replyExcerpt: created.body.slice(0, 140),
+            });
+          }
+        }
         return { ok: true };
       }
 
