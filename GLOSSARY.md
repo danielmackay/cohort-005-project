@@ -93,11 +93,26 @@ A Refund where the money couldn't be sent. The Refund Request stays approved, be
 The amount of Watched time on a course past which a Student can no longer get a Refund, because they've had the course.
 _Avoid_: Watch cap, Viewing threshold
 
+### Discussion
+
+**Comment**:
+Something a person writes under a lesson. It is either a Question or a Reply.
+
+**Question**:
+A top-level Comment a Student leaves on a lesson, for the course's Instructor to answer.
+
+**Reply**:
+A Comment that answers a Question. Replies go one level deep only; nobody replies to a Reply.
+
 ### Notifications
 
 **Notification**:
-A message Cadence sends a person to tell them something that concerns them has happened.
+A message Cadence sends a person to tell them something that concerns them has happened. Nobody is notified of something they did themselves.
 _Avoid_: Alert, Message, Activity
+
+**Notification Category**:
+A group of related Notifications that a person can treat as one, such as Refunds, Discussion, Enrollments or Seats.
+_Avoid_: Notification type, Topic
 
 **Notification Feed**:
 The place inside Cadence where a person sees their Notifications.
