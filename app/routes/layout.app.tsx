@@ -3,6 +3,10 @@ import type { Route } from "./+types/layout.app";
 import { Sidebar } from "~/components/sidebar";
 import { DevUI } from "~/components/dev-ui";
 import { Toaster } from "sonner";
+import { knockPublicConfig, knockUserId, signFeedToken } from "~/prototype/knock.server";
+import { NotificationFeedProvider, type KnockConfig } from "~/prototype/notification-feed/feed";
+import { PrototypeSwitcher, useVariant } from "~/prototype/notification-feed/switcher";
+import { VariantABell, VariantBNavItem, VariantCNavItem } from "~/prototype/notification-feed/variants";
 import { getCurrentUserId, getDevCountry } from "~/lib/session";
 import { getCountryTierInfo, COUNTRIES } from "~/lib/ppp";
 import { eq, and, or, sql, desc } from "drizzle-orm";
@@ -213,7 +217,37 @@ export async function loader({ request }: Route.LoaderArgs) {
     countryTierInfo,
     countries: COUNTRIES,
     isTeamAdmin: currentUserId ? isTeamAdmin(currentUserId) : false,
+    // PROTOTYPE: Notification Feed
+    knock: currentUserId
+      ? {
+          knockUserId: knockUserId(currentUserId),
+          token: await signFeedToken(currentUserId),
+          ...knockPublicConfig(),
+        }
+      : null,
   };
+}
+
+// PROTOTYPE: mounts whichever Notification Feed variant is selected.
+function FeedShell({
+  knock,
+  children,
+}: {
+  knock: KnockConfig | null;
+  children: (slots: { headerAddon?: React.ReactNode; navAddon?: React.ReactNode }) => React.ReactNode;
+}) {
+  const [variant, setVariant] = useVariant();
+  if (!knock) return <>{children({})}</>;
+  return (
+    <NotificationFeedProvider key={knock.knockUserId} config={knock} toastOnArrival={variant === "C"}>
+      {children({
+        headerAddon: variant === "A" ? <VariantABell /> : undefined,
+        navAddon:
+          variant === "B" ? <VariantBNavItem /> : variant === "C" ? <VariantCNavItem /> : undefined,
+      })}
+      <PrototypeSwitcher current={variant} onChange={setVariant} />
+    </NotificationFeedProvider>
+  );
 }
 
 export default function AppLayout({ loaderData }: Route.ComponentProps) {
@@ -225,18 +259,26 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     countryTierInfo,
     countries,
     isTeamAdmin: userIsTeamAdmin,
+    knock,
   } = loaderData;
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar
-        currentUser={currentUser}
-        recentCourses={recentCourses}
-        isTeamAdmin={userIsTeamAdmin}
-      />
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      <FeedShell knock={knock}>
+        {(slots) => (
+          <>
+            <Sidebar
+              currentUser={currentUser}
+              recentCourses={recentCourses}
+              isTeamAdmin={userIsTeamAdmin}
+              {...slots}
+            />
+            <main className="flex-1 overflow-y-auto">
+              <Outlet />
+            </main>
+          </>
+        )}
+      </FeedShell>
       <DevUI
         users={users}
         currentUser={currentUser}
