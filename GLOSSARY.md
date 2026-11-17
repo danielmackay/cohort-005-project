@@ -106,9 +106,13 @@ _Avoid_: Watch cap, Viewing threshold
 ### Notifications
 
 **Notification**:
-A message Cadence sends a person to tell them something that concerns them has happened.
+A message Cadence sends a person to tell them something that concerns them has happened. A receipt for the person's own action is not a Notification.
 _Avoid_: Alert, Message, Activity
 
 **Notification Feed**:
 The place inside Cadence where a person sees their Notifications.
 _Avoid_: Inbox, Activity feed
+
+**Channel**:
+A way a Notification reaches a person. Cadence has two: the Notification Feed, which every Notification goes out on, and email, which some also go out on.
+_Avoid_: Medium, Transport
