@@ -1,14 +1,14 @@
 import { eq } from "drizzle-orm";
-import { comments, courses, lessons, modules, users } from "~/db/schema";
+import { comments, courses, lessons, modules } from "~/db/schema";
 import { MAX_COMMENT_LENGTH, MIN_COMMENT_LENGTH } from "~/lib/comments";
 import { NotificationType, commentUrl, toSnippet } from "~/lib/notifications";
 import {
   archiveForCommentAfterCommit,
   notifyAfterCommit,
-  type NotificationUser,
   type Notifications,
 } from "~/lib/notifications.server";
 import type { Failure, Queryable } from "~/lib/refunds.server";
+import { getNotificationUser } from "~/lib/users.server";
 
 // ─── Comments ───
 // Discussion Questions (top-level comments) and Discussion Replies (one level
@@ -37,22 +37,6 @@ function getLesson(db: Queryable, lessonId: number) {
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
     .where(eq(lessons.id, lessonId))
-    .get();
-}
-
-function getNotificationUser(
-  db: Queryable,
-  userId: number
-): NotificationUser | undefined {
-  return db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      avatarUrl: users.avatarUrl,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
     .get();
 }
 

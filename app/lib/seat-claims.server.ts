@@ -1,14 +1,22 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { coupons, courses, enrollments, purchases } from "~/db/schema";
+import {
+  coupons,
+  courses,
+  enrollments,
+  purchases,
+  teamMembers,
+  TeamMemberRole,
+  users,
+} from "~/db/schema";
 import {
   findEnrollment,
-  getNotificationUser,
   insertEnrollment,
   notifyEnrollment,
 } from "~/lib/enrollments.server";
 import { NotificationType, TEAM_URL } from "~/lib/notifications";
 import {
   notifyAfterCommit,
+  type NotificationUser,
   type Notifications,
 } from "~/lib/notifications.server";
 import {
@@ -16,6 +24,7 @@ import {
   type Db,
   type Failure,
 } from "~/lib/refunds.server";
+import { getNotificationUser, toNotificationUser } from "~/lib/users.server";
 
 // ─── Seat claims ───
 // A Student claiming a Seat on a Team Licence by its code, which enrols them in
@@ -121,28 +130,43 @@ export async function claimSeat(
 // Sent after the claim has committed, through notifyAfterCommit, so a failing
 // port never fails the claim.
 
+/**
+ * The Team Admins of the team a Seat belongs to. Buying a Team Licence makes
+ * the buyer its team's Team Admin, and this is the same membership the
+ * Notifications card checks before it shows the Seat claims switch.
+ */
+function getTeamAdmins(db: Db, teamId: number): NotificationUser[] {
+  return db
+    .select()
+    .from(users)
+    .innerJoin(teamMembers, eq(teamMembers.userId, users.id))
+    .where(
+      and(
+        eq(teamMembers.teamId, teamId),
+        eq(teamMembers.role, TeamMemberRole.Admin)
+      )
+    )
+    .all()
+    .map((row) => toNotificationUser(row.users));
+}
+
 async function notifySeatClaimed(
   db: Db,
   notifications: Notifications,
   seat: Seat
 ) {
-  const purchase = db
-    .select({ userId: purchases.userId })
-    .from(purchases)
-    .where(eq(purchases.id, seat.purchaseId))
-    .get();
   const course = db
     .select({ title: courses.title })
     .from(courses)
     .where(eq(courses.id, seat.courseId))
     .get();
-  const teamAdmin = purchase && getNotificationUser(db, purchase.userId);
+  const teamAdmins = getTeamAdmins(db, seat.teamId);
   const claimer =
     seat.redeemedByUserId === null
       ? undefined
       : getNotificationUser(db, seat.redeemedByUserId);
 
-  if (!teamAdmin || !claimer || !course) {
+  if (teamAdmins.length === 0 || !claimer || !course) {
     console.error(
       `[notifications] Not sending the Seat claimed Notification for Seat ${seat.id}: ` +
         `its Team Admin, claimer or course was not found`
@@ -151,7 +175,8 @@ async function notifySeatClaimed(
   }
 
   // Notifications are only for what someone else did.
-  if (teamAdmin.id === claimer.id) return;
+  const recipients = teamAdmins.filter((admin) => admin.id !== claimer.id);
+  if (recipients.length === 0) return;
 
   // A refunded Seat can never be claimed, so it doesn't count as left.
   const seatsLeft = db
@@ -168,7 +193,7 @@ async function notifySeatClaimed(
 
   await notifyAfterCommit(notifications, {
     type: NotificationType.SeatClaimed,
-    recipients: [teamAdmin],
+    recipients,
     sender: claimer,
     data: {
       seatId: seat.id,

@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { courses, enrollments, users } from "~/db/schema";
+import { courses, enrollments } from "~/db/schema";
 import { NotificationType, courseStudentsUrl } from "~/lib/notifications";
 import {
   notifyAfterCommit,
-  type NotificationUser,
   type Notifications,
 } from "~/lib/notifications.server";
 import type { Db, Failure, Queryable } from "~/lib/refunds.server";
+import { getNotificationUser } from "~/lib/users.server";
 
 // ─── Enrollments ───
 // Enrolling a Student in a course, from an Individual Purchase or a Claimed
@@ -90,23 +90,6 @@ export function insertEnrollment(
 }
 
 // ─── Enrollment Notification ───
-
-export function getNotificationUser(
-  db: Queryable,
-  userId: number
-): NotificationUser | undefined {
-  const user = db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      avatarUrl: users.avatarUrl,
-    })
-    .from(users)
-    .where(eq(users.id, userId))
-    .get();
-  return user;
-}
 
 /**
  * Tells the course's Instructor about a new Enrollment. Call it only after the

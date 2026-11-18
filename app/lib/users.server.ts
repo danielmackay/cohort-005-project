@@ -15,13 +15,24 @@ import type { Failure, Queryable } from "~/lib/refunds.server";
 // Every function takes the database first, so tests can hand in an in-memory
 // one. Uses positional parameters (project convention).
 
-function toNotificationUser(user: typeof users.$inferSelect): NotificationUser {
+export function toNotificationUser(
+  user: typeof users.$inferSelect
+): NotificationUser {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     avatarUrl: user.avatarUrl,
   };
+}
+
+/** The user as a Notification names them, or undefined if there is no such user. */
+export function getNotificationUser(
+  db: Queryable,
+  userId: number
+): NotificationUser | undefined {
+  const user = db.select().from(users).where(eq(users.id, userId)).get();
+  return user ? toNotificationUser(user) : undefined;
 }
 
 export type SignUpResult = { userId: number; created: boolean };

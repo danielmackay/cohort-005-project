@@ -33,9 +33,9 @@ import {
 } from "~/lib/notifications";
 import {
   notifyAfterCommit,
-  type NotificationUser,
   type Notifications,
 } from "~/lib/notifications.server";
+import { getNotificationUser, toNotificationUser } from "~/lib/users.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -854,23 +854,6 @@ function buildDecisionEmail(
 // ─── Refund Request Notifications ───
 // Sent only after the domain write has committed, through notifyAfterCommit, so
 // a failing port never changes the outcome or the email the caller sends.
-
-function toNotificationUser(user: typeof users.$inferSelect): NotificationUser {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    avatarUrl: user.avatarUrl,
-  };
-}
-
-function getNotificationUser(
-  db: Queryable,
-  userId: number
-): NotificationUser | undefined {
-  const user = db.select().from(users).where(eq(users.id, userId)).get();
-  return user ? toNotificationUser(user) : undefined;
-}
 
 async function notifyRefundRequestRaised(
   db: Queryable,

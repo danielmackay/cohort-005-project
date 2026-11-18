@@ -255,6 +255,31 @@ describe("claimSeat Notifications", () => {
     ]);
   });
 
+  it("tells the Team Admin of the Seat's team, whoever the Purchase row names", async () => {
+    const seat = addSeat("SEAT-1");
+    const otherBuyer = db
+      .insert(schema.users)
+      .values({
+        name: "Bea Buyer",
+        email: "bea@example.com",
+        role: UserRole.Student,
+      })
+      .returning()
+      .get();
+    db.update(schema.purchases)
+      .set({ userId: otherBuyer.id })
+      .where(eq(schema.purchases.id, seat.purchaseId))
+      .run();
+
+    await claimSeat(db, notifications, "SEAT-1", base.user.id, "AU", NOW);
+
+    expect(
+      sent(NotificationType.SeatClaimed).map((n) =>
+        n.recipients.map((r) => r.id)
+      )
+    ).toEqual([[teamAdmin.id]]);
+  });
+
   it("counts down to no Seats left as each Seat is claimed", async () => {
     addSeat("SEAT-1");
     addSeat("SEAT-2");

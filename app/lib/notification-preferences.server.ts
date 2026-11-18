@@ -52,7 +52,8 @@ function categoriesFor(
     .get();
   if (hasPurchase) shown.add(NotificationCategory.RefundRequestUpdates);
 
-  // A Team Licence is the Purchase behind a team's Seats, so a team with
+  // Seat claimed Notifications go to the Team Admins of the claimed Seat's
+  // team. A Team Licence is the Purchase behind a team's Seats, so a team with
   // Seats has one.
   const isTeamLicenceAdmin = db
     .select({ id: coupons.id })
