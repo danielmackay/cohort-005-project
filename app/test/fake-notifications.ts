@@ -13,6 +13,8 @@ import type {
 
 export type FakeNotifications = Notifications & {
   notified: OutgoingNotification[];
+  /** Comment ids whose Notifications were archived, in call order. */
+  archivedCommentIds: number[];
   /** Every user synced, in order. */
   synced: NotificationUser[];
   /** Each user's stored preferences, by user id. Seed it to model a user who already has some. */
@@ -23,12 +25,14 @@ export type FakeNotifications = Notifications & {
 
 export function createFakeNotifications(): FakeNotifications {
   const notified: OutgoingNotification[] = [];
+  const archivedCommentIds: number[] = [];
   const synced: NotificationUser[] = [];
   const preferences = new Map<number, NotificationPreferences>();
   let failure: Error | null = null;
 
   return {
     notified,
+    archivedCommentIds,
     synced,
     preferences,
     failWith(error) {
@@ -41,6 +45,10 @@ export function createFakeNotifications(): FakeNotifications {
     async signUserToken(userId) {
       if (failure) throw failure;
       return `fake-token-for-${userId}`;
+    },
+    async archiveForComment(commentId) {
+      if (failure) throw failure;
+      archivedCommentIds.push(commentId);
     },
     async syncUser(user) {
       if (failure) throw failure;

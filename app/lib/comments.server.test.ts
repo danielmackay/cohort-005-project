@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { MAX_COMMENT_LENGTH } from "~/lib/comments";
+import { isDiscussionReplyData } from "~/lib/notifications";
 import { createComment, deleteComment, editComment } from "./comments.server";
 import {
   createFakeNotifications,
@@ -220,7 +221,14 @@ describe("deleteComment", () => {
   it("soft-deletes the author's own comment", async () => {
     const question = await postQuestion(base.user.id);
 
-    const result = deleteComment(db, question.id, base.user.id, false, LATER);
+    const result = await deleteComment(
+      db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
 
     expect(result).toMatchObject({
       ok: true,
@@ -231,8 +239,9 @@ describe("deleteComment", () => {
   it("lets staff delete someone else's comment", async () => {
     const question = await postQuestion(base.user.id);
 
-    const result = deleteComment(
+    const result = await deleteComment(
       db,
+      notifications,
       question.id,
       base.instructor.id,
       true,
@@ -248,7 +257,16 @@ describe("deleteComment", () => {
   it("refuses to delete someone else's comment for a non-staff user", async () => {
     const question = await postQuestion(base.instructor.id);
 
-    expect(deleteComment(db, question.id, base.user.id, false, LATER)).toEqual({
+    expect(
+      await deleteComment(
+        db,
+        notifications,
+        question.id,
+        base.user.id,
+        false,
+        LATER
+      )
+    ).toEqual({
       ok: false,
       status: 403,
       error: "You can only delete your own comments",
@@ -257,7 +275,9 @@ describe("deleteComment", () => {
   });
 
   it("refuses a comment that doesn't exist", async () => {
-    expect(deleteComment(db, 9999, base.user.id, false, LATER)).toEqual({
+    expect(
+      await deleteComment(db, notifications, 9999, base.user.id, false, LATER)
+    ).toEqual({
       ok: false,
       status: 404,
       error: "Comment not found",
@@ -266,10 +286,18 @@ describe("deleteComment", () => {
 
   it("keeps the first deletion time when deleted twice", async () => {
     const question = await postQuestion(base.user.id);
-    deleteComment(db, question.id, base.user.id, false, LATER);
-
-    const again = deleteComment(
+    await deleteComment(
       db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
+
+    const again = await deleteComment(
+      db,
+      notifications,
       question.id,
       base.user.id,
       false,
@@ -317,7 +345,14 @@ describe("editComment", () => {
 
   it("refuses to edit a deleted comment", async () => {
     const question = await postQuestion(base.user.id);
-    deleteComment(db, question.id, base.user.id, false, LATER);
+    await deleteComment(
+      db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
 
     expect(
       editComment(db, question.id, base.user.id, "Back again", LATER)
@@ -371,6 +406,11 @@ async function postQuestion(authorId: number, onLessonId = lessonId) {
   return result.comment;
 }
 
+// A question also notifies the Instructor, so reply tests look only at replies.
+function notifiedOfType(type: string) {
+  return notifications.notified.filter((n) => n.type === type);
+}
+
 async function postReply(authorId: number, questionId: number, body: string) {
   const result = await createComment(
     db,
@@ -395,7 +435,7 @@ describe("Discussion Reply Notification", () => {
       "Closures capture variables."
     );
 
-    expect(notifications.notified).toEqual([
+    expect(notifiedOfType("discussion-reply")).toEqual([
       {
         type: "discussion-reply",
         recipients: [
@@ -431,7 +471,7 @@ describe("Discussion Reply Notification", () => {
 
     await postReply(base.user.id, question.id, "Never mind, I worked it out.");
 
-    expect(notifications.notified).toEqual([]);
+    expect(notifiedOfType("discussion-reply")).toEqual([]);
   });
 
   it("notifies only the question's author, never other repliers in the thread", async () => {
@@ -491,9 +531,180 @@ describe("Discussion Reply Notification", () => {
       `First line\n\nsecond line ${"x".repeat(200)}`
     );
 
-    const snippet = notifications.notified[0]?.data.snippet ?? "";
+    const data = notifiedOfType("discussion-reply")[0]?.data;
+    const snippet = isDiscussionReplyData(data) ? data.snippet : "";
     expect(snippet.startsWith("First line second line xxx")).toBe(true);
     expect(snippet).toHaveLength(140);
     expect(snippet.endsWith("…")).toBe(true);
+  });
+});
+
+describe("Discussion Question Notification", () => {
+  it("notifies the course's Instructor when a Student asks a question", async () => {
+    const question = await postQuestion(base.user.id);
+
+    expect(notifications.notified).toEqual([
+      {
+        type: "discussion-question",
+        recipients: [
+          {
+            id: base.instructor.id,
+            name: "Test Instructor",
+            email: "instructor@example.com",
+            avatarUrl: null,
+          },
+        ],
+        sender: {
+          id: base.user.id,
+          name: "Test User",
+          email: "test@example.com",
+          avatarUrl: null,
+        },
+        data: {
+          commentId: question.id,
+          lessonId,
+          lessonTitle: "Lesson 1",
+          courseSlug: "test-course",
+          snippet: "How do closures work?",
+          url: `/courses/test-course/lessons/${lessonId}#comment-${question.id}`,
+        },
+        idempotencyKey: `discussion-question:${question.id}`,
+      },
+    ]);
+  });
+
+  it("notifies the Instructor when a Platform Admin asks a question", async () => {
+    const admin = db
+      .insert(schema.users)
+      .values({
+        name: "Platform Admin",
+        email: "admin@example.com",
+        role: schema.UserRole.Admin,
+      })
+      .returning()
+      .get();
+
+    await postQuestion(admin.id);
+
+    expect(
+      notifications.notified.map((n) => ({
+        type: n.type,
+        recipients: n.recipients.map((r) => r.id),
+        sender: n.sender?.id,
+      }))
+    ).toEqual([
+      {
+        type: "discussion-question",
+        recipients: [base.instructor.id],
+        sender: admin.id,
+      },
+    ]);
+  });
+
+  it("sends nothing when the Instructor asks a question on their own course", async () => {
+    await postQuestion(base.instructor.id);
+
+    expect(notifications.notified).toEqual([]);
+  });
+
+  it("still posts the question when sending the Notification fails", async () => {
+    notifications.failWith(new Error("Knock is down"));
+
+    const result = await createComment(
+      db,
+      notifications,
+      base.user.id,
+      lessonId,
+      null,
+      "How do closures work?",
+      NOW
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      comment: { parentId: null, body: "How do closures work?" },
+    });
+    expect(db.select().from(schema.comments).all()).toHaveLength(1);
+  });
+
+  it("sends nothing when a comment is edited", async () => {
+    const question = await postQuestion(base.user.id);
+    notifications.notified.length = 0;
+
+    editComment(db, question.id, base.user.id, "Edited question", NOW);
+
+    expect(notifications.notified).toEqual([]);
+    expect(notifications.archivedCommentIds).toEqual([]);
+  });
+});
+
+describe("Archiving Notifications when a comment is deleted", () => {
+  const LATER = new Date(2026, 9, 7, 9, 0, 0);
+
+  it("archives the Notifications of a deleted Discussion Reply", async () => {
+    const question = await postQuestion(base.user.id);
+    const reply = await postReply(base.instructor.id, question.id, "Answer.");
+
+    await deleteComment(
+      db,
+      notifications,
+      reply.id,
+      base.instructor.id,
+      false,
+      LATER
+    );
+
+    expect(notifications.archivedCommentIds).toEqual([reply.id]);
+  });
+
+  it("archives only the deleted Question's own Notifications, leaving its replies'", async () => {
+    const question = await postQuestion(base.user.id);
+    await postReply(base.instructor.id, question.id, "Answer.");
+
+    await deleteComment(
+      db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
+
+    expect(notifications.archivedCommentIds).toEqual([question.id]);
+  });
+
+  it("archives nothing when the delete is refused", async () => {
+    const question = await postQuestion(base.instructor.id);
+
+    await deleteComment(
+      db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
+
+    expect(notifications.archivedCommentIds).toEqual([]);
+  });
+
+  it("still deletes the comment when archiving fails", async () => {
+    const question = await postQuestion(base.user.id);
+    notifications.failWith(new Error("Knock is down"));
+
+    const result = await deleteComment(
+      db,
+      notifications,
+      question.id,
+      base.user.id,
+      false,
+      LATER
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      comment: { deletedAt: LATER.toISOString() },
+    });
+    expect(getStored(question.id)?.deletedAt).toBe(LATER.toISOString());
   });
 });

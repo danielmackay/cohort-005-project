@@ -1,0 +1,18 @@
+{
+  "name": "Open Refund Request",
+  "description": "Notification 3: tells every Platform Admin about a new Open Refund Request (who asked, the course, the amount and the reason). Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "categories": ["open-refund-requests"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "**{{ buyerName }}** asked for a refund on **{{ courseTitle }}**: {{ reason }}",
+        "action_url": "{{ vars.app_url }}{{ url }}"
+      }
+    }
+  ]
+}

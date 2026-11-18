@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { parseFormData, parseParams } from "~/lib/validation";
 import { raiseRefundRequest } from "~/lib/refunds.server";
 import { sendEmail } from "~/lib/mailer.server";
+import { defaultNotifications } from "~/lib/notifications.server";
 
 const refundParamsSchema = z.object({
   slug: z.string().min(1),
@@ -60,8 +61,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     throw data("Purchase not found.", { status: 404 });
   }
 
-  const result = raiseRefundRequest(
+  const result = await raiseRefundRequest(
     db,
+    await defaultNotifications(),
     purchase.id,
     currentUserId,
     parsed.data.reason,
