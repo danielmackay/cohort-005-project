@@ -861,8 +861,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     if (!existing || existing.lessonId !== lessonId) {
       throw data("Comment not found", { status: 404 });
     }
-    const result = deleteComment(
+    const result = await deleteComment(
       db,
+      await defaultNotifications(),
       parsed.data.commentId,
       currentUserId,
       access.isStaff,

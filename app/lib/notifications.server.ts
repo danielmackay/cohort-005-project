@@ -44,6 +44,12 @@ export interface Notifications {
   ): Promise<void>;
   /** Signs a token that lets the browser read only this user's Notification Feed. */
   signUserToken(userId: number): Promise<string>;
+  /**
+   * Archives every Notification whose trigger data names this comment as its
+   * `commentId`, so it leaves every recipient's feed. Notifications that only
+   * mention it as `questionId` (replies under a question) are left alone.
+   */
+  archiveForComment(commentId: number): Promise<void>;
 }
 
 /**
@@ -65,6 +71,24 @@ export async function notifyAfterCommit<T extends NotificationType>(
   }
 }
 
+/**
+ * Archives a comment's Notifications after its soft delete has committed.
+ * Like notifyAfterCommit, a failure is logged and never fails the delete.
+ */
+export async function archiveForCommentAfterCommit(
+  notifications: Notifications,
+  commentId: number
+): Promise<void> {
+  try {
+    await notifications.archiveForComment(commentId);
+  } catch (error) {
+    console.error(
+      `[notifications] Failed to archive Notifications for comment ${commentId}`,
+      error
+    );
+  }
+}
+
 // ─── No-op adapter ───
 
 export function loggingNotifications(
@@ -81,6 +105,11 @@ export function loggingNotifications(
     async signUserToken() {
       throw new Error(
         "Knock is not configured, so no user token can be signed"
+      );
+    },
+    async archiveForComment(commentId) {
+      log(
+        `[notifications] Knock is not configured; not archiving Notifications for comment ${commentId}`
       );
     },
   };

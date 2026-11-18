@@ -62,6 +62,63 @@ describe("describeNotification", () => {
     expect(row.href).toBeNull();
   });
 
+  it("refuses a protocol-relative link", () => {
+    const row = describeNotification(
+      feedNotification({
+        data: {
+          commentId: 7,
+          questionId: 3,
+          lessonId: 9,
+          lessonTitle: "Closures",
+          courseSlug: "js-basics",
+          snippet: "Hi",
+          url: "//evil.example/phish",
+        },
+      })
+    );
+    expect(row.href).toBeNull();
+  });
+
+  it("renders a Discussion Question row from its trigger data", () => {
+    expect(
+      describeNotification(
+        feedNotification({
+          type: "discussion-question",
+          data: {
+            commentId: 3,
+            lessonId: 9,
+            lessonTitle: "Closures",
+            courseSlug: "js-basics",
+            snippet: "How do closures work?",
+            url: "/courses/js-basics/lessons/9#comment-3",
+          },
+        })
+      )
+    ).toEqual({
+      title: "Ada Lovelace asked a question on Closures",
+      snippet: "How do closures work?",
+      href: "/courses/js-basics/lessons/9#comment-3",
+      recognised: true,
+    });
+  });
+
+  it("refuses a Discussion Question link that leaves the site", () => {
+    const row = describeNotification(
+      feedNotification({
+        type: "discussion-question",
+        data: {
+          commentId: 3,
+          lessonId: 9,
+          lessonTitle: "Closures",
+          courseSlug: "js-basics",
+          snippet: "Hi",
+          url: "//evil.example/phish",
+        },
+      })
+    );
+    expect(row.href).toBeNull();
+  });
+
   it("renders a generic row for an unknown Notification type", () => {
     expect(
       describeNotification(feedNotification({ type: "something-new" }))

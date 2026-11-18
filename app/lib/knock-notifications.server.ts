@@ -13,6 +13,7 @@ import type {
 /** Each catalogue Notification is a Knock workflow with this key. */
 const WORKFLOW_KEY: Record<NotificationType, string> = {
   "discussion-reply": "discussion-reply",
+  "discussion-question": "discussion-question",
 };
 
 // Long enough to read a feed in one sitting. A DevUI switch re-runs the layout
@@ -63,6 +64,23 @@ export function knockNotifications(config: KnockServerConfig): Notifications {
         // domain event could send the Notification twice.
         { idempotencyKey: notification.idempotencyKey }
       );
+    },
+
+    async archiveForComment(commentId) {
+      // Knock matches trigger_data against top-level scalars, and the match is
+      // type-sensitive: the JSON number 42 finds `commentId: 42`, the string
+      // "42" finds nothing. Triggers send commentId as a number, so filter
+      // with one.
+      const messageIds: string[] = [];
+      for await (const message of knock.messages.list({
+        trigger_data: JSON.stringify({ commentId }),
+        channel_id: config.feedChannelId,
+      })) {
+        messageIds.push(message.id);
+      }
+      // Knock refuses an empty batch with a 422.
+      if (messageIds.length === 0) return;
+      await knock.messages.batch.archive({ message_ids: messageIds });
     },
 
     signUserToken(userId) {

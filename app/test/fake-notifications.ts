@@ -8,16 +8,20 @@ import type {
 
 export type FakeNotifications = Notifications & {
   notified: OutgoingNotification[];
+  /** Comment ids whose Notifications were archived, in call order. */
+  archivedCommentIds: number[];
   /** Makes every later call reject with this error. */
   failWith(error: Error): void;
 };
 
 export function createFakeNotifications(): FakeNotifications {
   const notified: OutgoingNotification[] = [];
+  const archivedCommentIds: number[] = [];
   let failure: Error | null = null;
 
   return {
     notified,
+    archivedCommentIds,
     failWith(error) {
       failure = error;
     },
@@ -28,6 +32,10 @@ export function createFakeNotifications(): FakeNotifications {
     async signUserToken(userId) {
       if (failure) throw failure;
       return `fake-token-for-${userId}`;
+    },
+    async archiveForComment(commentId) {
+      if (failure) throw failure;
+      archivedCommentIds.push(commentId);
     },
   };
 }

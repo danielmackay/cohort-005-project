@@ -9,6 +9,7 @@
 /** The catalogue of Notifications Cadence can send. */
 export const NotificationType = {
   DiscussionReply: "discussion-reply",
+  DiscussionQuestion: "discussion-question",
 } as const;
 
 export type NotificationType =
@@ -20,6 +21,7 @@ export type NotificationType =
  */
 export const NotificationCategory = {
   DiscussionReplies: "discussion-replies",
+  DiscussionQuestions: "discussion-questions",
 } as const;
 
 export type NotificationCategory =
@@ -30,6 +32,8 @@ export const NOTIFICATION_CATEGORY: Record<
   NotificationCategory
 > = {
   [NotificationType.DiscussionReply]: NotificationCategory.DiscussionReplies,
+  [NotificationType.DiscussionQuestion]:
+    NotificationCategory.DiscussionQuestions,
 };
 
 /** Trigger data for a Discussion Reply Notification. A snapshot taken when sent. */
@@ -45,9 +49,21 @@ export type DiscussionReplyData = {
   url: string;
 };
 
+/** Trigger data for a Discussion Question Notification. A snapshot taken when sent. */
+export type DiscussionQuestionData = {
+  // Top-level scalar for the same reason as DiscussionReplyData.commentId.
+  commentId: number;
+  lessonId: number;
+  lessonTitle: string;
+  courseSlug: string;
+  snippet: string;
+  url: string;
+};
+
 /** Maps each catalogue Notification to the trigger data it carries. */
 export type NotificationData = {
   [NotificationType.DiscussionReply]: DiscussionReplyData;
+  [NotificationType.DiscussionQuestion]: DiscussionQuestionData;
 };
 
 // ─── Snippets and links ───
@@ -92,10 +108,33 @@ export function isDiscussionReplyData(
     typeof value.lessonTitle === "string" &&
     typeof value.courseSlug === "string" &&
     typeof value.snippet === "string" &&
-    typeof value.url === "string" &&
-    // Only same-site paths: the link comes from trigger data, which a
-    // malformed or hostile payload could point anywhere.
-    value.url.startsWith("/")
+    isSameSitePath(value.url)
+  );
+}
+
+export function isDiscussionQuestionData(
+  value: unknown
+): value is DiscussionQuestionData {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.commentId) &&
+    isFiniteNumber(value.lessonId) &&
+    typeof value.lessonTitle === "string" &&
+    typeof value.courseSlug === "string" &&
+    typeof value.snippet === "string" &&
+    isSameSitePath(value.url)
+  );
+}
+
+// Only same-site paths: the link comes from trigger data, which a malformed or
+// hostile payload could point anywhere. "//host" and "/\host" are
+// protocol-relative in browsers, so they leave the site too.
+function isSameSitePath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.startsWith("/\\")
   );
 }
 
@@ -147,6 +186,19 @@ export function describeNotification(
     const data = notification.data;
     return {
       title: `${senderName} replied to your question on ${data.lessonTitle}`,
+      snippet: data.snippet,
+      href: data.url,
+      recognised: true,
+    };
+  }
+
+  if (
+    notification.type === NotificationType.DiscussionQuestion &&
+    isDiscussionQuestionData(notification.data)
+  ) {
+    const data = notification.data;
+    return {
+      title: `${senderName} asked a question on ${data.lessonTitle}`,
       snippet: data.snippet,
       href: data.url,
       recognised: true,
