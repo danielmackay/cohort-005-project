@@ -14,6 +14,7 @@ import {
   deleteComment,
   editComment,
 } from "~/lib/comments.server";
+import { defaultNotifications } from "~/lib/notifications.server";
 import { db } from "~/db";
 import {
   categories,
@@ -819,8 +820,9 @@ export async function action({ params, request }: Route.ActionArgs) {
       if (!parsed.success) {
         return { ok: false, error: "Enter a comment before posting." };
       }
-      const result = createComment(
+      const result = await createComment(
         db,
+        await defaultNotifications(),
         currentUserId,
         lessonId,
         parsed.data.parentId ?? null,

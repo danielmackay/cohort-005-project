@@ -1,6 +1,12 @@
 import { eq } from "drizzle-orm";
-import { comments, courses, lessons, modules } from "~/db/schema";
+import { comments, courses, lessons, modules, users } from "~/db/schema";
 import { MAX_COMMENT_LENGTH, MIN_COMMENT_LENGTH } from "~/lib/comments";
+import { NotificationType, commentUrl, toSnippet } from "~/lib/notifications";
+import {
+  notifyAfterCommit,
+  type NotificationUser,
+  type Notifications,
+} from "~/lib/notifications.server";
 import type { Failure, Queryable } from "~/lib/refunds.server";
 
 // ─── Comments ───
@@ -18,15 +24,30 @@ function getComment(db: Queryable, commentId: number) {
   return db.select().from(comments).where(eq(comments.id, commentId)).get();
 }
 
-function lessonExists(db: Queryable, lessonId: number) {
-  const lesson = db
-    .select({ id: lessons.id })
+function getLesson(db: Queryable, lessonId: number) {
+  return db
+    .select({ id: lessons.id, title: lessons.title, courseSlug: courses.slug })
     .from(lessons)
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
     .where(eq(lessons.id, lessonId))
     .get();
-  return lesson !== undefined;
+}
+
+function getNotificationUser(
+  db: Queryable,
+  userId: number
+): NotificationUser | undefined {
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
 }
 
 function validateBody(body: string): { ok: true; body: string } | Failure {
@@ -48,22 +69,29 @@ function validateBody(body: string): { ok: true; body: string } | Failure {
  * Posts a Discussion Question (`parentId` null) or a Discussion Reply to one.
  * Replies are one level deep only, so a reply's parent must be a question on
  * the same lesson.
+ *
+ * A Discussion Reply from anyone but the question's author sends that author a
+ * Discussion Reply Notification once the comment is saved. Other repliers in
+ * the thread are never notified.
  */
-export function createComment(
+export async function createComment(
   db: Queryable,
+  notifications: Notifications,
   authorId: number,
   lessonId: number,
   parentId: number | null,
   body: string,
   now: Date
-): CommentResult {
+): Promise<CommentResult> {
   const valid = validateBody(body);
   if (!valid.ok) return valid;
 
-  if (!lessonExists(db, lessonId)) {
+  const lesson = getLesson(db, lessonId);
+  if (!lesson) {
     return { ok: false, status: 404, error: "Lesson not found" };
   }
 
+  let question: Comment | undefined;
   if (parentId !== null) {
     const parent = getComment(db, parentId);
     if (!parent) {
@@ -83,6 +111,7 @@ export function createComment(
         error: "Replies can only be one level deep",
       };
     }
+    question = parent;
   }
 
   const comment = db
@@ -97,7 +126,45 @@ export function createComment(
     .returning()
     .get();
 
+  if (question && question.userId !== authorId) {
+    await notifyQuestionAuthor(db, notifications, question, comment, lesson);
+  }
+
   return { ok: true, comment };
+}
+
+async function notifyQuestionAuthor(
+  db: Queryable,
+  notifications: Notifications,
+  question: Comment,
+  reply: Comment,
+  lesson: { id: number; title: string; courseSlug: string }
+) {
+  const recipient = getNotificationUser(db, question.userId);
+  const sender = getNotificationUser(db, reply.userId);
+  if (!recipient || !sender) {
+    console.error(
+      `[notifications] Not sending discussion-reply:${reply.id}: ` +
+        `question author ${question.userId} or replier ${reply.userId} not found`
+    );
+    return;
+  }
+
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.DiscussionReply,
+    recipients: [recipient],
+    sender,
+    data: {
+      commentId: reply.id,
+      questionId: question.id,
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      courseSlug: lesson.courseSlug,
+      snippet: toSnippet(reply.body),
+      url: commentUrl(lesson.courseSlug, lesson.id, reply.id),
+    },
+    idempotencyKey: `discussion-reply:${reply.id}`,
+  });
 }
 
 /** Replaces the body of the author's own comment. Deleted comments stay deleted. */

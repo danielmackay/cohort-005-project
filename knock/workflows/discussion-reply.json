@@ -1,0 +1,18 @@
+{
+  "name": "Discussion Reply",
+  "description": "Notification 7: someone replied to a Discussion Question the recipient asked. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "categories": ["discussion-replies"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "**{{ actor.name }}** replied to your question on **{{ lessonTitle }}**: {{ snippet }}",
+        "action_url": "{{ vars.app_url }}{{ url }}"
+      }
+    }
+  ]
+}

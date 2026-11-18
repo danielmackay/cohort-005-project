@@ -14,6 +14,7 @@ import { AlertTriangle, CheckCircle2, ExternalLink } from "lucide-react";
 import { cn, daysSince, formatRelativeTime } from "~/lib/utils";
 import { MAX_COMMENT_LENGTH } from "~/lib/comments";
 import { createComment } from "~/lib/comments.server";
+import { defaultNotifications } from "~/lib/notifications.server";
 import { parseFormData } from "~/lib/validation";
 import { db } from "~/db";
 import {
@@ -171,8 +172,9 @@ export async function action({ request }: Route.ActionArgs) {
     throw data("You must be logged in", { status: 401 });
   }
 
-  const result = createComment(
+  const result = await createComment(
     db,
+    await defaultNotifications(),
     access.userId,
     question.lessonId,
     question.id,
