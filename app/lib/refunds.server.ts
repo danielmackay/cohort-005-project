@@ -34,7 +34,7 @@ import {
 
 export type Db = BetterSQLite3Database<typeof schema>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
-type Queryable = Db | Tx;
+export type Queryable = Db | Tx;
 
 type Purchase = typeof purchases.$inferSelect;
 type Seat = typeof coupons.$inferSelect;
