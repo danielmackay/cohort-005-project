@@ -11,6 +11,7 @@ import { formatPrice } from "~/lib/utils";
 /** The catalogue of Notifications Cadence can send. */
 export const NotificationType = {
   DiscussionReply: "discussion-reply",
+  DiscussionQuestion: "discussion-question",
   RefundRequestConfirmation: "refund-request-confirmation",
   OpenRefundRequest: "open-refund-request",
   RefundRequestApproved: "refund-request-approved",
@@ -26,6 +27,7 @@ export type NotificationType =
  */
 export const NotificationCategory = {
   DiscussionReplies: "discussion-replies",
+  DiscussionQuestions: "discussion-questions",
   RefundRequestUpdates: "refund-request-updates",
   OpenRefundRequests: "open-refund-requests",
 } as const;
@@ -38,6 +40,8 @@ export const NOTIFICATION_CATEGORY: Record<
   NotificationCategory
 > = {
   [NotificationType.DiscussionReply]: NotificationCategory.DiscussionReplies,
+  [NotificationType.DiscussionQuestion]:
+    NotificationCategory.DiscussionQuestions,
   [NotificationType.RefundRequestConfirmation]:
     NotificationCategory.RefundRequestUpdates,
   [NotificationType.OpenRefundRequest]: NotificationCategory.OpenRefundRequests,
@@ -53,6 +57,17 @@ export type DiscussionReplyData = {
   // top-level scalar values, and deleting a comment archives by commentId.
   commentId: number;
   questionId: number;
+  lessonId: number;
+  lessonTitle: string;
+  courseSlug: string;
+  snippet: string;
+  url: string;
+};
+
+/** Trigger data for a Discussion Question Notification. A snapshot taken when sent. */
+export type DiscussionQuestionData = {
+  // Top-level scalar for the same reason as DiscussionReplyData.commentId.
+  commentId: number;
   lessonId: number;
   lessonTitle: string;
   courseSlug: string;
@@ -107,6 +122,7 @@ export type RefundRequestDeclinedData = {
 /** Maps each catalogue Notification to the trigger data it carries. */
 export type NotificationData = {
   [NotificationType.DiscussionReply]: DiscussionReplyData;
+  [NotificationType.DiscussionQuestion]: DiscussionQuestionData;
   [NotificationType.RefundRequestConfirmation]: RefundRequestConfirmationData;
   [NotificationType.OpenRefundRequest]: OpenRefundRequestData;
   [NotificationType.RefundRequestApproved]: RefundRequestApprovedData;
@@ -161,10 +177,33 @@ export function isDiscussionReplyData(
     typeof value.lessonTitle === "string" &&
     typeof value.courseSlug === "string" &&
     typeof value.snippet === "string" &&
-    typeof value.url === "string" &&
-    // Only same-site paths: the link comes from trigger data, which a
-    // malformed or hostile payload could point anywhere.
-    value.url.startsWith("/")
+    isSameSitePath(value.url)
+  );
+}
+
+export function isDiscussionQuestionData(
+  value: unknown
+): value is DiscussionQuestionData {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.commentId) &&
+    isFiniteNumber(value.lessonId) &&
+    typeof value.lessonTitle === "string" &&
+    typeof value.courseSlug === "string" &&
+    typeof value.snippet === "string" &&
+    isSameSitePath(value.url)
+  );
+}
+
+// Only same-site paths: the link comes from trigger data, which a malformed or
+// hostile payload could point anywhere. "//host" and "/\host" are
+// protocol-relative in browsers, so they leave the site too.
+function isSameSitePath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("/") &&
+    !value.startsWith("//") &&
+    !value.startsWith("/\\")
   );
 }
 
@@ -222,6 +261,18 @@ export function describeNotification(
     };
   }
 
+  if (
+    notification.type === NotificationType.DiscussionQuestion &&
+    isDiscussionQuestionData(notification.data)
+  ) {
+    const data = notification.data;
+    return {
+      title: `${senderName} asked a question on ${data.lessonTitle}`,
+      snippet: data.snippet,
+      href: data.url,
+      recognised: true,
+    };
+  }
   const refundRequestRow = describeRefundRequestNotification(notification);
   if (refundRequestRow) return refundRequestRow;
 
@@ -234,19 +285,6 @@ export function describeNotification(
 }
 
 // ─── Refund Request rows ───
-
-/**
- * A path on this site. A protocol-relative `//host` (or `/\host`, which
- * browsers treat the same) also starts with "/" but leaves the site.
- */
-function isSameSitePath(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.startsWith("/") &&
-    !value.startsWith("//") &&
-    !value.startsWith("/\\")
-  );
-}
 
 function hasRefundRequestFields(
   value: unknown

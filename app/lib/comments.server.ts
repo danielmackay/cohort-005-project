@@ -3,6 +3,7 @@ import { comments, courses, lessons, modules, users } from "~/db/schema";
 import { MAX_COMMENT_LENGTH, MIN_COMMENT_LENGTH } from "~/lib/comments";
 import { NotificationType, commentUrl, toSnippet } from "~/lib/notifications";
 import {
+  archiveForCommentAfterCommit,
   notifyAfterCommit,
   type NotificationUser,
   type Notifications,
@@ -26,7 +27,12 @@ function getComment(db: Queryable, commentId: number) {
 
 function getLesson(db: Queryable, lessonId: number) {
   return db
-    .select({ id: lessons.id, title: lessons.title, courseSlug: courses.slug })
+    .select({
+      id: lessons.id,
+      title: lessons.title,
+      courseSlug: courses.slug,
+      instructorId: courses.instructorId,
+    })
     .from(lessons)
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
@@ -129,8 +135,48 @@ export async function createComment(
   if (question && question.userId !== authorId) {
     await notifyQuestionAuthor(db, notifications, question, comment, lesson);
   }
+  if (!question && lesson.instructorId !== authorId) {
+    await notifyInstructor(db, notifications, comment, lesson);
+  }
 
   return { ok: true, comment };
+}
+
+async function notifyInstructor(
+  db: Queryable,
+  notifications: Notifications,
+  question: Comment,
+  lesson: {
+    id: number;
+    title: string;
+    courseSlug: string;
+    instructorId: number;
+  }
+) {
+  const recipient = getNotificationUser(db, lesson.instructorId);
+  const sender = getNotificationUser(db, question.userId);
+  if (!recipient || !sender) {
+    console.error(
+      `[notifications] Not sending discussion-question:${question.id}: ` +
+        `instructor ${lesson.instructorId} or asker ${question.userId} not found`
+    );
+    return;
+  }
+
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.DiscussionQuestion,
+    recipients: [recipient],
+    sender,
+    data: {
+      commentId: question.id,
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      courseSlug: lesson.courseSlug,
+      snippet: toSnippet(question.body),
+      url: commentUrl(lesson.courseSlug, lesson.id, question.id),
+    },
+    idempotencyKey: `discussion-question:${question.id}`,
+  });
 }
 
 async function notifyQuestionAuthor(
@@ -207,14 +253,19 @@ export function editComment(
  * Soft-deletes a comment: its author or staff on the course may. The row stays
  * so a deleted question can still anchor the replies beneath it. Deleting an
  * already-deleted comment keeps its first deletion time.
+ *
+ * Once deleted, the Notifications this comment caused are archived so nobody
+ * is sent to a comment that's gone. Deleting a question leaves its replies'
+ * Notifications: those replies are still shown.
  */
-export function deleteComment(
+export async function deleteComment(
   db: Queryable,
+  notifications: Notifications,
   commentId: number,
   deleterId: number,
   isStaff: boolean,
   now: Date
-): CommentResult {
+): Promise<CommentResult> {
   const existing = getComment(db, commentId);
   if (!existing) {
     return { ok: false, status: 404, error: "Comment not found" };
@@ -236,6 +287,8 @@ export function deleteComment(
     .where(eq(comments.id, commentId))
     .returning()
     .get();
+
+  await archiveForCommentAfterCommit(notifications, comment.id);
 
   return { ok: true, comment };
 }
