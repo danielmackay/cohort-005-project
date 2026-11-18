@@ -23,6 +23,8 @@ const WORKFLOW_KEY: Record<NotificationType, string> = {
   "open-refund-request": "open-refund-request",
   "refund-request-approved": "refund-request-approved",
   "refund-request-declined": "refund-request-declined",
+  "seat-claimed": "seat-claimed",
+  "new-enrollment": "new-enrollment",
 };
 
 // Long enough to read a feed in one sitting. A DevUI switch re-runs the layout

@@ -1,6 +1,12 @@
 import { and, eq } from "drizzle-orm";
-import { courses, enrollments } from "~/db/schema";
-import type { Failure, Queryable } from "~/lib/refunds.server";
+import { courses, enrollments, users } from "~/db/schema";
+import { NotificationType, courseStudentsUrl } from "~/lib/notifications";
+import {
+  notifyAfterCommit,
+  type NotificationUser,
+  type Notifications,
+} from "~/lib/notifications.server";
+import type { Db, Failure, Queryable } from "~/lib/refunds.server";
 
 // ─── Enrollments ───
 // Enrolling a Student in a course, from an Individual Purchase or a Claimed
@@ -29,10 +35,29 @@ export function findEnrollment(
 }
 
 /**
- * Enrols a Student in a course. Takes a transaction as well as the database so
- * a Seat claim can enrol in the same transaction that claims the Seat.
+ * Enrols a Student in a course and tells the Instructor. Use insertEnrollment
+ * instead when the Enrollment is one write in a bigger transaction.
  */
-export function enrollUser(
+export async function enrollUser(
+  db: Db,
+  notifications: Notifications,
+  userId: number,
+  courseId: number,
+  now: Date
+): Promise<EnrollResult> {
+  const result = insertEnrollment(db, userId, courseId, now);
+  if (!result.ok) return result;
+
+  await notifyEnrollment(db, notifications, result.enrollment);
+  return result;
+}
+
+/**
+ * Writes an Enrollment without sending anything, so it can run inside a
+ * transaction (a Seat claim, an Individual Purchase). The caller sends the
+ * Enrollment Notification with notifyEnrollment once the transaction commits.
+ */
+export function insertEnrollment(
   db: Queryable,
   userId: number,
   courseId: number,
@@ -62,4 +87,69 @@ export function enrollUser(
     .get();
 
   return { ok: true, enrollment };
+}
+
+// ─── Enrollment Notification ───
+
+export function getNotificationUser(
+  db: Queryable,
+  userId: number
+): NotificationUser | undefined {
+  const user = db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
+  return user;
+}
+
+/**
+ * Tells the course's Instructor about a new Enrollment. Call it only after the
+ * Enrollment has committed: a failing port is logged and never fails the
+ * Enrollment.
+ */
+export async function notifyEnrollment(
+  db: Queryable,
+  notifications: Notifications,
+  enrollment: Enrollment
+): Promise<void> {
+  const course = db
+    .select({ title: courses.title, instructorId: courses.instructorId })
+    .from(courses)
+    .where(eq(courses.id, enrollment.courseId))
+    .get();
+  const student = getNotificationUser(db, enrollment.userId);
+  const instructor = course && getNotificationUser(db, course.instructorId);
+
+  if (!course || !student || !instructor) {
+    console.error(
+      `[notifications] Not sending the Enrollment Notification for Enrollment ${enrollment.id}: ` +
+        `its course, Student or Instructor was not found`
+    );
+    return;
+  }
+
+  // Notifications are only for what someone else did.
+  if (instructor.id === student.id) return;
+
+  // Sent to every Instructor regardless: the vendor drops it for anyone whose
+  // Enrollments preference is off, which it is by default.
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.NewEnrollment,
+    recipients: [instructor],
+    sender: student,
+    data: {
+      enrollmentId: enrollment.id,
+      courseId: enrollment.courseId,
+      studentName: student.name,
+      courseTitle: course.title,
+      url: courseStudentsUrl(enrollment.courseId),
+    },
+    idempotencyKey: `${NotificationType.NewEnrollment}:${enrollment.id}`,
+  });
 }

@@ -1,0 +1,18 @@
+{
+  "name": "New Enrollment",
+  "description": "Notification 5: tells a course's Instructor that a Student enrolled (Individual Purchase, Claimed Seat or Lapsed Student again). Off by default: only Instructors who opted in get it. Cadence renders the row text; the template is only a fallback.",
+  "categories": ["enrollments"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "**{{ studentName }}** enrolled in **{{ courseTitle }}**",
+        "action_url": "{{ vars.app_url }}{{ url }}"
+      }
+    }
+  ]
+}

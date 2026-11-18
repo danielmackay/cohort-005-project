@@ -328,3 +328,96 @@ describe("describeNotification for Refund Requests", () => {
     ).toBeNull();
   });
 });
+
+describe("describeNotification for Seat claims and Enrollments", () => {
+  const seatClaimed = {
+    seatId: 12,
+    purchaseId: 4,
+    claimerName: "Grace Hopper",
+    courseTitle: "JS Basics",
+    seatsLeft: 3,
+    url: "/team",
+  };
+
+  const newEnrollment = {
+    enrollmentId: 30,
+    courseId: 7,
+    studentName: "Grace Hopper",
+    courseTitle: "JS Basics",
+    url: "/instructor/7/students",
+  };
+
+  it("renders a Seat claim with how many Seats are left, linking to the team page", () => {
+    expect(
+      describeNotification(
+        feedNotification({ type: "seat-claimed", data: seatClaimed })
+      )
+    ).toEqual({
+      title: "Ada Lovelace claimed a Seat on JS Basics",
+      snippet: "3 Seats left",
+      href: "/team",
+      icon: "team",
+      avatar: { kind: "sender", name: "Ada Lovelace", avatarUrl: null },
+      recognised: true,
+    });
+  });
+
+  it("says one Seat or no Seats are left", () => {
+    const snippetFor = (seatsLeft: number) =>
+      describeNotification(
+        feedNotification({
+          type: "seat-claimed",
+          data: { ...seatClaimed, seatsLeft },
+        })
+      ).snippet;
+
+    expect(snippetFor(1)).toBe("1 Seat left");
+    expect(snippetFor(0)).toBe("No Seats left");
+  });
+
+  it("names the claimer from the data when the sender is missing", () => {
+    expect(
+      describeNotification(
+        feedNotification({
+          type: "seat-claimed",
+          sender: null,
+          data: seatClaimed,
+        })
+      ).title
+    ).toBe("Grace Hopper claimed a Seat on JS Basics");
+  });
+
+  it("renders an Enrollment, linking to the course's students page", () => {
+    expect(
+      describeNotification(
+        feedNotification({ type: "new-enrollment", data: newEnrollment })
+      )
+    ).toEqual({
+      title: "Ada Lovelace enrolled in JS Basics",
+      snippet: "",
+      href: "/instructor/7/students",
+      icon: "enrollment",
+      avatar: { kind: "sender", name: "Ada Lovelace", avatarUrl: null },
+      recognised: true,
+    });
+  });
+
+  it("renders a generic row when the data is malformed or links off-site", () => {
+    expect(
+      describeNotification(
+        feedNotification({
+          type: "seat-claimed",
+          data: { ...seatClaimed, seatsLeft: "3" },
+        })
+      ).recognised
+    ).toBe(false);
+    expect(
+      describeNotification(
+        feedNotification({
+          type: "new-enrollment",
+          data: { ...newEnrollment, url: "https://evil.example/phish" },
+        })
+      ).href
+    ).toBeNull();
+  });
+});

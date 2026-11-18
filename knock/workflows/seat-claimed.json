@@ -1,0 +1,18 @@
+{
+  "name": "Seat Claimed",
+  "description": "Notification 4: tells the Team Admin who owns a Team Licence that one of its Seats was claimed (who, the course and how many Seats are left). Cadence renders the row text; the template is only a fallback.",
+  "categories": ["seat-claims"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "**{{ claimerName }}** claimed a Seat on **{{ courseTitle }}**. Seats left: {{ seatsLeft }}",
+        "action_url": "{{ vars.app_url }}{{ url }}"
+      }
+    }
+  ]
+}
