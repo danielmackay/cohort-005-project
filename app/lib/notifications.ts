@@ -122,41 +122,112 @@ export type FeedNotification = {
   seenAt: string | null;
 };
 
+const BADGE_CAP = 9;
+
+/** The bell's badge text for an unseen count, or null when there's no badge. */
+export function unseenBadgeLabel(unseenCount: number): string | null {
+  if (unseenCount <= 0) return null;
+  return unseenCount > BADGE_CAP ? `${BADGE_CAP}+` : String(unseenCount);
+}
+
+/**
+ * The small icon at the bottom-right of a row's avatar. "generic" is for a
+ * Notification the feed couldn't recognise.
+ */
+export type NotificationIcon =
+  | "discussion"
+  | "refund"
+  | "team"
+  | "enrollment"
+  | "generic";
+
+/** The sender's real avatar, or Cadence's "C" when Cadence itself sent it. */
+export type NotificationAvatar =
+  | { kind: "sender"; name: string; avatarUrl: string | null }
+  | { kind: "cadence" };
+
 export type NotificationRow = {
   title: string;
   snippet: string;
   /** Where clicking the row goes, or null when there is nowhere to go. */
   href: string | null;
+  icon: NotificationIcon;
+  avatar: NotificationAvatar;
   /** False when the type or data wasn't recognised and a generic row is shown. */
   recognised: boolean;
 };
 
+type RowText = Pick<NotificationRow, "title" | "snippet" | "href">;
+
+/** How the feed renders one catalogue Notification. */
+type RowRenderer<T extends NotificationType> = {
+  /** Checks untyped trigger data before `text` sees it. */
+  isData: (value: unknown) => value is NotificationData[T];
+  icon: Exclude<NotificationIcon, "generic">;
+  text: (data: NotificationData[T], senderName: string) => RowText;
+};
+
+// Every catalogue Notification must have a renderer: adding a type to
+// `NotificationType` fails typecheck until it gets one here.
+const ROW_RENDERERS: { [T in NotificationType]: RowRenderer<T> } = {
+  [NotificationType.DiscussionReply]: {
+    isData: isDiscussionReplyData,
+    icon: "discussion",
+    text: (data, senderName) => ({
+      title: `${senderName} replied to your question on ${data.lessonTitle}`,
+      snippet: data.snippet,
+      href: data.url,
+    }),
+  },
+};
+
+function isNotificationType(type: string): type is NotificationType {
+  return Object.hasOwn(ROW_RENDERERS, type);
+}
+
+// Narrows the renderer and its data together, which TypeScript can't do
+// through an index on a union key.
+function renderRow<T extends NotificationType>(
+  renderer: RowRenderer<T>,
+  data: unknown,
+  senderName: string
+): (RowText & { icon: NotificationIcon }) | null {
+  if (!renderer.isData(data)) return null;
+  return { ...renderer.text(data, senderName), icon: renderer.icon };
+}
+
 /**
- * Builds a feed row's text and link from a Notification. An unknown type or
- * data that fails its type guard gets a generic row rather than a cast.
+ * Builds a feed row's text, link, icon and avatar from a Notification. An
+ * unknown type or data that fails its type guard gets a generic row rather
+ * than a cast; the caller logs it.
  */
 export function describeNotification(
   notification: FeedNotification
 ): NotificationRow {
+  const avatar: NotificationAvatar = notification.sender
+    ? {
+        kind: "sender",
+        name: notification.sender.name,
+        avatarUrl: notification.sender.avatarUrl,
+      }
+    : { kind: "cadence" };
   const senderName = notification.sender?.name ?? "Someone";
 
-  if (
-    notification.type === NotificationType.DiscussionReply &&
-    isDiscussionReplyData(notification.data)
-  ) {
-    const data = notification.data;
-    return {
-      title: `${senderName} replied to your question on ${data.lessonTitle}`,
-      snippet: data.snippet,
-      href: data.url,
-      recognised: true,
-    };
-  }
+  const rendered = isNotificationType(notification.type)
+    ? renderRow(
+        ROW_RENDERERS[notification.type],
+        notification.data,
+        senderName
+      )
+    : null;
 
+  if (rendered) return { ...rendered, avatar, recognised: true };
   return {
     title: "New notification",
     snippet: "",
     href: null,
+    icon: "generic",
+    avatar,
     recognised: false,
   };
 }

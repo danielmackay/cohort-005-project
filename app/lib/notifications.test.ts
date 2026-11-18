@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { describeNotification, type FeedNotification } from "./notifications";
+import {
+  describeNotification,
+  unseenBadgeLabel,
+  type FeedNotification,
+} from "./notifications";
+
+describe("unseenBadgeLabel", () => {
+  it("shows no badge when nothing is unseen", () => {
+    expect(unseenBadgeLabel(0)).toBeNull();
+  });
+
+  it("shows the exact count up to nine", () => {
+    expect(unseenBadgeLabel(1)).toBe("1");
+    expect(unseenBadgeLabel(9)).toBe("9");
+  });
+
+  it("caps the count at 9+", () => {
+    expect(unseenBadgeLabel(10)).toBe("9+");
+    expect(unseenBadgeLabel(250)).toBe("9+");
+  });
+});
 
 function feedNotification(
   overrides: Partial<FeedNotification>
@@ -30,8 +50,28 @@ describe("describeNotification", () => {
       title: "Ada Lovelace replied to your question on Closures",
       snippet: "They capture variables.",
       href: "/courses/js-basics/lessons/9#comment-7",
+      icon: "discussion",
+      avatar: { kind: "sender", name: "Ada Lovelace", avatarUrl: null },
       recognised: true,
     });
+  });
+
+  it("shows the sender's real avatar", () => {
+    const row = describeNotification(
+      feedNotification({
+        sender: { name: "Ada Lovelace", avatarUrl: "/avatars/ada.png" },
+      })
+    );
+    expect(row.avatar).toEqual({
+      kind: "sender",
+      name: "Ada Lovelace",
+      avatarUrl: "/avatars/ada.png",
+    });
+  });
+
+  it("shows the Cadence avatar when there is no sender", () => {
+    const row = describeNotification(feedNotification({ sender: null }));
+    expect(row.avatar).toEqual({ kind: "cadence" });
   });
 
   it("renders a generic row with no link when the data is malformed", () => {
@@ -41,8 +81,16 @@ describe("describeNotification", () => {
       title: "New notification",
       snippet: "",
       href: null,
+      icon: "generic",
+      avatar: { kind: "sender", name: "Ada Lovelace", avatarUrl: null },
       recognised: false,
     });
+  });
+
+  it("renders a generic row when the data is missing entirely", () => {
+    expect(
+      describeNotification(feedNotification({ data: null })).recognised
+    ).toBe(false);
   });
 
   it("refuses a link that leaves the site", () => {
