@@ -1,8 +1,11 @@
 // Pushes and commits every Knock workflow in knock/workflows/ (and the
-// preference categories they belong to) to the Knock Development environment,
-// through Knock's Management API.
+// preference categories they belong to) to a Knock environment, through
+// Knock's Management API. See docs/knock.md.
 //
-// Usage: npm run knock:setup
+// Usage: npm run knock:setup [-- <environment>]
+//
+// The environment is the Knock environment slug: the first argument, else
+// KNOCK_ENVIRONMENT, else "development".
 //
 // Needs in .env (or the shell):
 // - KNOCK_SERVICE_TOKEN: a Management API service token (Knock dashboard →
@@ -13,14 +16,15 @@
 //
 // Safe to re-run: each workflow is upserted, then committed, because Knock only
 // runs committed workflows (an uncommitted one returns 404 on trigger, and its
-// categories don't exist at runtime). Workflows only change in Development;
-// promote a commit to other environments from the Knock dashboard.
+// categories don't exist at runtime). Knock normally only accepts edits in
+// Development and expects other environments to receive changes by promoting
+// a commit; it reports the refusal if a target environment won't take a push.
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 const MANAGEMENT_API = "https://control.knock.app/v1";
-const ENVIRONMENT = "development";
+const DEFAULT_ENVIRONMENT = "development";
 const WORKFLOWS_DIR = join(import.meta.dirname, "..", "knock", "workflows");
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -81,8 +85,21 @@ async function feedChannelKey(token: string, feedChannelId: string) {
   return channel.key;
 }
 
+function targetEnvironment(): string {
+  const environment =
+    process.argv[2] || process.env.KNOCK_ENVIRONMENT || DEFAULT_ENVIRONMENT;
+  // Knock environment slugs are lowercase words joined by hyphens.
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(environment)) {
+    throw new Error(
+      `"${environment}" is not a Knock environment slug (e.g. development, production).`
+    );
+  }
+  return environment;
+}
+
 async function main() {
   if (existsSync(".env")) process.loadEnvFile(".env");
+  const environment = targetEnvironment();
   const token = requireEnv("KNOCK_SERVICE_TOKEN");
   const channelKey = await feedChannelKey(
     token,
@@ -116,20 +133,20 @@ async function main() {
       await management(
         token,
         "PUT",
-        `/preference_categories/${encodeURIComponent(category)}?environment=${ENVIRONMENT}`,
+        `/preference_categories/${encodeURIComponent(category)}?environment=${environment}`,
         { preference_category: { name: category } }
       );
       console.log(`✓ preference category ${category}`);
     }
 
     const query = new URLSearchParams({
-      environment: ENVIRONMENT,
+      environment,
       commit: "true",
       commit_message: `Sync ${key} from knock/workflows/${file}`,
     });
     await management(token, "PUT", `/workflows/${key}?${query}`, { workflow });
     console.log(
-      `✓ ${key}: pushed and committed to ${ENVIRONMENT} (feed channel ${channelKey})`
+      `✓ ${key}: pushed and committed to ${environment} (feed channel ${channelKey})`
     );
   }
 }
