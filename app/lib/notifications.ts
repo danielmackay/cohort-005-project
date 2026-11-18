@@ -19,6 +19,11 @@ export type NotificationType =
  * belongs to exactly one.
  */
 export const NotificationCategory = {
+  RefundRequestUpdates: "refund-request-updates",
+  OpenRefundRequests: "open-refund-requests",
+  SeatClaims: "seat-claims",
+  Enrollments: "enrollments",
+  DiscussionQuestions: "discussion-questions",
   DiscussionReplies: "discussion-replies",
 } as const;
 
@@ -31,6 +36,57 @@ export const NOTIFICATION_CATEGORY: Record<
 > = {
   [NotificationType.DiscussionReply]: NotificationCategory.DiscussionReplies,
 };
+
+// ─── Preferences (category × channel) ───
+
+/**
+ * Where a Notification can be delivered. Only the feed exists today; email
+ * becomes a second channel later, with no change to stored preferences.
+ */
+export const NotificationChannel = {
+  Feed: "feed",
+} as const;
+
+export type NotificationChannel =
+  (typeof NotificationChannel)[keyof typeof NotificationChannel];
+
+/** Whether each category is on, per channel. A missing entry has no preference yet. */
+export type NotificationPreferences = Partial<
+  Record<NotificationCategory, Partial<Record<NotificationChannel, boolean>>>
+>;
+
+/**
+ * Everyone starts with every category on, except Enrollments: a popular course
+ * would flood an Instructor's feed, so they opt in.
+ */
+export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
+  NotificationCategory,
+  Record<NotificationChannel, boolean>
+> = {
+  [NotificationCategory.RefundRequestUpdates]: { feed: true },
+  [NotificationCategory.OpenRefundRequests]: { feed: true },
+  [NotificationCategory.SeatClaims]: { feed: true },
+  [NotificationCategory.Enrollments]: { feed: false },
+  [NotificationCategory.DiscussionQuestions]: { feed: true },
+  [NotificationCategory.DiscussionReplies]: { feed: true },
+};
+
+/**
+ * The defaults for the categories a user has no preference for yet. Syncing
+ * writes only these, so a re-sync never overwrites a choice someone made, and a
+ * category added to the catalogue later gets its default on the next sync.
+ */
+export function defaultsForMissingCategories(
+  existingCategories: ReadonlySet<string>
+): NotificationPreferences {
+  const missing: NotificationPreferences = {};
+  for (const category of Object.values(NotificationCategory)) {
+    if (!existingCategories.has(category)) {
+      missing[category] = { ...DEFAULT_NOTIFICATION_PREFERENCES[category] };
+    }
+  }
+  return missing;
+}
 
 /** Trigger data for a Discussion Reply Notification. A snapshot taken when sent. */
 export type DiscussionReplyData = {

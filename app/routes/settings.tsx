@@ -17,6 +17,8 @@ import { db } from "~/db";
 import { eq } from "drizzle-orm";
 import { formatPrice } from "~/lib/utils";
 import { listRefundRequestsForBuyer } from "~/lib/refunds.server";
+import { updateProfile } from "~/lib/users.server";
+import { defaultNotifications } from "~/lib/notifications.server";
 
 const settingsSchema = z.object({
   name: z.string().trim().min(1, "Name cannot be empty."),
@@ -70,15 +72,6 @@ export async function action({ request }: Route.ActionArgs) {
     throw data("You must be logged in.", { status: 401 });
   }
 
-  const currentUser = db
-    .select()
-    .from(users)
-    .where(eq(users.id, currentUserId))
-    .get();
-  if (!currentUser) {
-    throw data("User not found.", { status: 404 });
-  }
-
   const formData = await request.formData();
   const parsed = parseFormData(formData, settingsSchema);
 
@@ -88,12 +81,16 @@ export async function action({ request }: Route.ActionArgs) {
 
   const { name, bio } = parsed.data;
 
-  db
-    .update(users)
-    .set({ name, email: currentUser.email, bio: bio || null })
-    .where(eq(users.id, currentUser.id))
-    .returning()
-    .get();
+  const result = await updateProfile(
+    db,
+    await defaultNotifications(),
+    currentUserId,
+    name,
+    bio || null
+  );
+  if (!result.ok) {
+    throw data(result.error, { status: result.status });
+  }
   return { success: true };
 }
 
