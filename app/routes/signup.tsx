@@ -2,14 +2,14 @@ import { Form, Link, useActionData, useNavigation, useSearchParams } from "react
 import { redirect, data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/signup";
-import { UserRole, users } from "~/db/schema";
 import { setCurrentUserId, getCurrentUserId } from "~/lib/session";
+import { signUp } from "~/lib/users.server";
+import { defaultNotifications } from "~/lib/notifications.server";
 import { parseFormData } from "~/lib/validation";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { db } from "~/db";
-import { eq } from "drizzle-orm";
 
 const signupSchema = z.object({
   name: z.string().trim().min(1, "Name is required."),
@@ -60,26 +60,9 @@ export async function action({ request, url }: Route.ActionArgs) {
   const redirectTo = url.searchParams.get("redirectTo");
   const destination = redirectTo && redirectTo.startsWith("/") ? redirectTo : "/courses";
 
-  // If email already exists, silently log them in
-  const existingUser = db
-    .select()
-    .from(users)
-    .where(eq(users.email, email))
-    .get();
-  if (existingUser) {
-    const cookie = await setCurrentUserId(request, existingUser.id);
-    throw redirect(destination, {
-      headers: { "Set-Cookie": cookie },
-    });
-  }
-
-  // Create new user as student
-  const newUser = db
-    .insert(users)
-    .values({ name, email, role: UserRole.Student, avatarUrl: null })
-    .returning()
-    .get();
-  const cookie = await setCurrentUserId(request, newUser.id);
+  // An existing email silently logs in; a new one creates a Student.
+  const { userId } = await signUp(db, await defaultNotifications(), name, email);
+  const cookie = await setCurrentUserId(request, userId);
   throw redirect(destination, {
     headers: { "Set-Cookie": cookie },
   });

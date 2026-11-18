@@ -50,6 +50,12 @@ export interface Notifications {
    * mention it as `questionId` (replies under a question) are left alone.
    */
   archiveForComment(commentId: number): Promise<void>;
+  /**
+   * Sync user: tells the vendor the user's current name, email and avatar, and
+   * writes the default Notification preferences for every category the user
+   * has no preference for yet. Never overwrites an existing preference.
+   */
+  syncUser(user: NotificationUser): Promise<void>;
 }
 
 /**
@@ -89,6 +95,23 @@ export async function archiveForCommentAfterCommit(
   }
 }
 
+/**
+ * Syncs a user after their row has been written. Like `notifyAfterCommit`, a
+ * failure is logged and swallowed: a vendor outage must never fail signup or a
+ * profile edit. Triggers identify their recipients inline, so a user whose
+ * sync failed still receives Notifications.
+ */
+export async function syncUserAfterCommit(
+  notifications: Notifications,
+  user: NotificationUser
+): Promise<void> {
+  try {
+    await notifications.syncUser(user);
+  } catch (error) {
+    console.error(`[notifications] Failed to sync user ${user.id}`, error);
+  }
+}
+
 // ─── No-op adapter ───
 
 export function loggingNotifications(
@@ -110,6 +133,11 @@ export function loggingNotifications(
     async archiveForComment(commentId) {
       log(
         `[notifications] Knock is not configured; not archiving Notifications for comment ${commentId}`
+      );
+    },
+    async syncUser(user) {
+      log(
+        `[notifications] Knock is not configured; not syncing user ${user.id}`
       );
     },
   };
@@ -187,6 +215,15 @@ async function getConfigured(): Promise<Configured> {
 /** The app's Notifications port: Knock when configured, otherwise the no-op. */
 export async function defaultNotifications(): Promise<Notifications> {
   return (await getConfigured()).port;
+}
+
+/**
+ * The Knock adapter, or null when Knock isn't configured. For scripts (seed,
+ * backfill) that should say so once rather than fall back to the no-op.
+ */
+export async function knockNotificationsIfConfigured(): Promise<Notifications | null> {
+  const { config, port } = await getConfigured();
+  return config ? port : null;
 }
 
 /**

@@ -1,5 +1,10 @@
-import Knock, { signUserToken } from "@knocklabs/node";
-import type { NotificationType } from "~/lib/notifications";
+import Knock, { NotFoundError, signUserToken } from "@knocklabs/node";
+import {
+  NotificationChannel,
+  defaultsForMissingCategories,
+  type NotificationPreferences,
+  type NotificationType,
+} from "~/lib/notifications";
 import type {
   KnockServerConfig,
   NotificationUser,
@@ -36,7 +41,9 @@ function knockUserId(userId: number): string {
 
 // Inline identification on every trigger: Knock drops a recipient it has never
 // seen (no message, no error), and the actor's current name and avatar are
-// what the feed shows for who sent each Notification.
+// what the feed shows for who sent each Notification. This stays alongside
+// syncUser because sync is best-effort: a user whose sync failed, or who was
+// created before the backfill ran, must still receive Notifications.
 function toKnockUser(user: NotificationUser) {
   return {
     id: knockUserId(user.id),
@@ -93,5 +100,83 @@ export function knockNotifications(config: KnockServerConfig): Notifications {
         expiresInSeconds: USER_TOKEN_TTL_SECONDS,
       });
     },
+
+    async syncUser(user) {
+      const { id, ...properties } = toKnockUser(user);
+      // An upsert: creates the user, or updates them in place.
+      await knock.users.update(id, properties);
+
+      const missing = defaultsForMissingCategories(
+        await existingPreferenceCategories(knock, id)
+      );
+      if (Object.keys(missing).length === 0) return;
+
+      await knock.users.setPreferences(id, PREFERENCE_SET, {
+        // Knock replaces the whole set by default; merge writes only the
+        // missing categories and leaves every existing choice alone.
+        __persistence_strategy__: "merge",
+        categories: toKnockCategories(missing, config.feedChannelId),
+      });
+    },
   };
+}
+
+// ─── Preferences ───
+
+const PREFERENCE_SET = "default";
+
+/**
+ * The categories the user's preference set already names.
+ *
+ * Checked against Knock Development: an unknown user gets 404, and an
+ * identified user's set always comes back with the environment default (set in
+ * the Knock dashboard) merged in, indistinguishable from the user's own
+ * choices. So a category the environment default covers counts as already set
+ * and is left to that default.
+ */
+async function existingPreferenceCategories(
+  knock: Knock,
+  knockUserId: string
+): Promise<Set<string>> {
+  try {
+    const set = await knock.users.getPreferences(knockUserId, PREFERENCE_SET);
+    return new Set(Object.keys(set.categories ?? {}));
+  } catch (error) {
+    if (error instanceof NotFoundError) return new Set();
+    throw error;
+  }
+}
+
+/** Knock's channel id for each Cadence channel. */
+function knockChannelIds(
+  feedChannelId: string
+): Record<NotificationChannel, string> {
+  return { [NotificationChannel.Feed]: feedChannelId };
+}
+
+function isNotificationChannel(value: string): value is NotificationChannel {
+  return Object.values<string>(NotificationChannel).includes(value);
+}
+
+/**
+ * Cadence category names are Knock's category keys as they are (the workflows
+ * in knock/workflows/ declare them), and each Cadence channel becomes its
+ * Knock channel id.
+ */
+function toKnockCategories(
+  preferences: NotificationPreferences,
+  feedChannelId: string
+): Record<string, { channels: Record<string, boolean> }> {
+  const channelIds = knockChannelIds(feedChannelId);
+  const categories: Record<string, { channels: Record<string, boolean> }> = {};
+  for (const [category, byChannel] of Object.entries(preferences)) {
+    const channels: Record<string, boolean> = {};
+    for (const [channel, enabled] of Object.entries(byChannel ?? {})) {
+      if (isNotificationChannel(channel) && typeof enabled === "boolean") {
+        channels[channelIds[channel]] = enabled;
+      }
+    }
+    categories[category] = { channels };
+  }
+  return categories;
 }

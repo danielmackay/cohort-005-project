@@ -14,6 +14,8 @@ import {
   QuestionType,
   TeamMemberRole,
 } from "../app/db/schema";
+import { knockNotificationsIfConfigured } from "../app/lib/notifications.server";
+import { syncAllUsers } from "../app/lib/users.server";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2810,6 +2812,23 @@ This course is still in draft while the cluster examples are rewritten against t
   }
 
   console.log(`Created ${watchEventRows.length} video watch events.`);
+
+  // ─── Knock users ───
+  // Seeded users get the same sync as a signup. Without Knock keys this is
+  // skipped; a failure is reported and never fails the seed.
+
+  const notifications = await knockNotificationsIfConfigured();
+  if (notifications) {
+    const report = await syncAllUsers(db, notifications);
+    console.log(
+      `Synced ${report.synced.length} users to Knock` +
+        (report.failed.length > 0
+          ? `; ${report.failed.length} failed (users ${report.failed.map((f) => f.userId).join(", ")}).`
+          : ".")
+    );
+  } else {
+    console.log("Knock is not configured; skipped syncing users to Knock.");
+  }
 
   // ─── Summary ───
 
