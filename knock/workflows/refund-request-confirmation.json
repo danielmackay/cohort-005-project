@@ -1,0 +1,18 @@
+{
+  "name": "Refund Request confirmation",
+  "description": "Notification 8: confirms to the buyer that their Refund Request was raised and is under review. Sent by Cadence itself, so there is no actor. Cadence renders the row text from the trigger data, with no link; the template is only a fallback, and Knock requires its action_url.",
+  "categories": ["refund-request-updates"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "Your refund request for **{{ courseTitle }}** is under review.",
+        "action_url": "{{ vars.app_url }}/settings#refund-requests"
+      }
+    }
+  ]
+}

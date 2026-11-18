@@ -13,6 +13,10 @@ import type {
 /** Each catalogue Notification is a Knock workflow with this key. */
 const WORKFLOW_KEY: Record<NotificationType, string> = {
   "discussion-reply": "discussion-reply",
+  "refund-request-confirmation": "refund-request-confirmation",
+  "open-refund-request": "open-refund-request",
+  "refund-request-approved": "refund-request-approved",
+  "refund-request-declined": "refund-request-declined",
 };
 
 // Long enough to read a feed in one sitting. A DevUI switch re-runs the layout

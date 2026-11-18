@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb, seedBaseData } from "~/test/setup";
 import * as schema from "~/db/schema";
 import { MAX_COMMENT_LENGTH } from "~/lib/comments";
+import { isDiscussionReplyData } from "~/lib/notifications";
 import { createComment, deleteComment, editComment } from "./comments.server";
 import {
   createFakeNotifications,
@@ -491,7 +492,8 @@ describe("Discussion Reply Notification", () => {
       `First line\n\nsecond line ${"x".repeat(200)}`
     );
 
-    const snippet = notifications.notified[0]?.data.snippet ?? "";
+    const data = notifications.notified[0]?.data;
+    const snippet = isDiscussionReplyData(data) ? data.snippet : "";
     expect(snippet.startsWith("First line second line xxx")).toBe(true);
     expect(snippet).toHaveLength(140);
     expect(snippet.endsWith("…")).toBe(true);

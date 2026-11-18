@@ -1,0 +1,18 @@
+{
+  "name": "Refund Request approved",
+  "description": "Notification 1: tells the buyer a Platform Admin approved their Refund Request, with the decision note if there is one. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "categories": ["refund-request-updates"],
+  "trigger_frequency": "every_trigger",
+  "steps": [
+    {
+      "ref": "feed",
+      "type": "channel",
+      "channel_type": "in_app_feed",
+      "channel_key": "$FEED_CHANNEL_KEY",
+      "template": {
+        "markdown_body": "Your refund for **{{ courseTitle }}** was approved. {{ decisionNote }}",
+        "action_url": "{{ vars.app_url }}{{ url }}"
+      }
+    }
+  ]
+}
