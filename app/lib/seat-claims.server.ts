@@ -1,6 +1,16 @@
-import { eq } from "drizzle-orm";
-import { coupons, enrollments, purchases } from "~/db/schema";
-import { enrollUser, findEnrollment } from "~/lib/enrollments.server";
+import { and, eq, isNull } from "drizzle-orm";
+import { coupons, courses, enrollments, purchases } from "~/db/schema";
+import {
+  findEnrollment,
+  getNotificationUser,
+  insertEnrollment,
+  notifyEnrollment,
+} from "~/lib/enrollments.server";
+import { NotificationType, TEAM_URL } from "~/lib/notifications";
+import {
+  notifyAfterCommit,
+  type Notifications,
+} from "~/lib/notifications.server";
 import {
   getSeatAvailability,
   type Db,
@@ -34,13 +44,14 @@ export function getSeatByCode(db: Db, code: string): Seat | undefined {
  * be claimed from the country its Team Licence was bought in, and not while
  * the Team Licence has an Open Refund Request or after it was refunded.
  */
-export function claimSeat(
+export async function claimSeat(
   db: Db,
+  notifications: Notifications,
   code: string,
   userId: number,
   userCountry: string,
   now: Date
-): ClaimResult {
+): Promise<ClaimResult> {
   const seat = getSeatByCode(db, code);
   if (!seat) {
     return { ok: false, status: 404, error: "Coupon not found" };
@@ -86,8 +97,8 @@ export function claimSeat(
   }
 
   // Enrol before claiming so a refused Enrollment leaves the Seat unclaimed.
-  return db.transaction((tx): ClaimResult => {
-    const enrolled = enrollUser(tx, userId, seat.courseId, now);
+  const result = db.transaction((tx): ClaimResult => {
+    const enrolled = insertEnrollment(tx, userId, seat.courseId, now);
     if (!enrolled.ok) return enrolled;
 
     const claimed = tx
@@ -98,5 +109,75 @@ export function claimSeat(
       .get();
 
     return { ok: true, seat: claimed, enrollment: enrolled.enrollment };
+  });
+  if (!result.ok) return result;
+
+  await notifySeatClaimed(db, notifications, result.seat);
+  await notifyEnrollment(db, notifications, result.enrollment);
+  return result;
+}
+
+// ─── Seat claimed Notification ───
+// Sent after the claim has committed, through notifyAfterCommit, so a failing
+// port never fails the claim.
+
+async function notifySeatClaimed(
+  db: Db,
+  notifications: Notifications,
+  seat: Seat
+) {
+  const purchase = db
+    .select({ userId: purchases.userId })
+    .from(purchases)
+    .where(eq(purchases.id, seat.purchaseId))
+    .get();
+  const course = db
+    .select({ title: courses.title })
+    .from(courses)
+    .where(eq(courses.id, seat.courseId))
+    .get();
+  const teamAdmin = purchase && getNotificationUser(db, purchase.userId);
+  const claimer =
+    seat.redeemedByUserId === null
+      ? undefined
+      : getNotificationUser(db, seat.redeemedByUserId);
+
+  if (!teamAdmin || !claimer || !course) {
+    console.error(
+      `[notifications] Not sending the Seat claimed Notification for Seat ${seat.id}: ` +
+        `its Team Admin, claimer or course was not found`
+    );
+    return;
+  }
+
+  // Notifications are only for what someone else did.
+  if (teamAdmin.id === claimer.id) return;
+
+  // A refunded Seat can never be claimed, so it doesn't count as left.
+  const seatsLeft = db
+    .select({ id: coupons.id })
+    .from(coupons)
+    .where(
+      and(
+        eq(coupons.purchaseId, seat.purchaseId),
+        isNull(coupons.redeemedByUserId),
+        isNull(coupons.refundedAt)
+      )
+    )
+    .all().length;
+
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.SeatClaimed,
+    recipients: [teamAdmin],
+    sender: claimer,
+    data: {
+      seatId: seat.id,
+      purchaseId: seat.purchaseId,
+      claimerName: claimer.name,
+      courseTitle: course.title,
+      seatsLeft,
+      url: TEAM_URL,
+    },
+    idempotencyKey: `${NotificationType.SeatClaimed}:${seat.id}`,
   });
 }

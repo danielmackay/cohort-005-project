@@ -16,6 +16,8 @@ export const NotificationType = {
   OpenRefundRequest: "open-refund-request",
   RefundRequestApproved: "refund-request-approved",
   RefundRequestDeclined: "refund-request-declined",
+  SeatClaimed: "seat-claimed",
+  NewEnrollment: "new-enrollment",
 } as const;
 
 export type NotificationType =
@@ -51,6 +53,8 @@ export const NOTIFICATION_CATEGORY: Record<
     NotificationCategory.RefundRequestUpdates,
   [NotificationType.RefundRequestDeclined]:
     NotificationCategory.RefundRequestUpdates,
+  [NotificationType.SeatClaimed]: NotificationCategory.SeatClaims,
+  [NotificationType.NewEnrollment]: NotificationCategory.Enrollments,
 };
 
 // ─── Preferences (category × channel) ───
@@ -172,6 +176,29 @@ export type RefundRequestDeclinedData = {
   url: string;
 };
 
+/** Notification 4: a Seat on the Team Admin's Team Licence was claimed. */
+export type SeatClaimedData = {
+  seatId: number;
+  purchaseId: number;
+  // A snapshot alongside the sender, so the row still reads right if the
+  // sender is missing.
+  claimerName: string;
+  courseTitle: string;
+  /** Unclaimed Seats on the Team Licence right after this claim. */
+  seatsLeft: number;
+  url: string;
+};
+
+/** Notification 5: a Student enrolled in the Instructor's course. */
+export type NewEnrollmentData = {
+  enrollmentId: number;
+  courseId: number;
+  // A snapshot for the same reason as SeatClaimedData.claimerName.
+  studentName: string;
+  courseTitle: string;
+  url: string;
+};
+
 /** Maps each catalogue Notification to the trigger data it carries. */
 export type NotificationData = {
   [NotificationType.DiscussionReply]: DiscussionReplyData;
@@ -180,6 +207,8 @@ export type NotificationData = {
   [NotificationType.OpenRefundRequest]: OpenRefundRequestData;
   [NotificationType.RefundRequestApproved]: RefundRequestApprovedData;
   [NotificationType.RefundRequestDeclined]: RefundRequestDeclinedData;
+  [NotificationType.SeatClaimed]: SeatClaimedData;
+  [NotificationType.NewEnrollment]: NewEnrollmentData;
 };
 
 // ─── Snippets and links ───
@@ -206,6 +235,14 @@ export const OPEN_REFUND_REQUESTS_URL = "/admin/refunds";
 
 /** The buyer's own Refund Requests, on their Settings page. */
 export const BUYER_REFUND_REQUESTS_URL = "/settings#refund-requests";
+
+/** Where a Team Admin manages their Team Licences and Seats. */
+export const TEAM_URL = "/team";
+
+/** Where an Instructor sees who is enrolled in their course. */
+export function courseStudentsUrl(courseId: number): string {
+  return `/instructor/${courseId}/students`;
+}
 
 // ─── Reading trigger data back (browser) ───
 // Trigger data comes back from the vendor as untyped JSON, so every field is
@@ -396,6 +433,24 @@ const ROW_RENDERERS: { [T in NotificationType]: RowRenderer<T> } = {
       href: data.url,
     }),
   },
+  [NotificationType.SeatClaimed]: {
+    isData: isSeatClaimedData,
+    icon: "team",
+    text: (data, senderName) => ({
+      title: `${senderName ?? data.claimerName} claimed a Seat on ${data.courseTitle}`,
+      snippet: seatsLeftLabel(data.seatsLeft),
+      href: data.url,
+    }),
+  },
+  [NotificationType.NewEnrollment]: {
+    isData: isNewEnrollmentData,
+    icon: "enrollment",
+    text: (data, senderName) => ({
+      title: `${senderName ?? data.studentName} enrolled in ${data.courseTitle}`,
+      snippet: "",
+      href: data.url,
+    }),
+  },
 };
 
 function isNotificationType(type: string): type is NotificationType {
@@ -496,4 +551,36 @@ export function isRefundRequestDeclinedData(
     typeof value.decisionNote === "string" &&
     isSameSitePath(value.url)
   );
+}
+
+// ─── Seat claim and Enrollment rows ───
+
+export function isSeatClaimedData(value: unknown): value is SeatClaimedData {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.seatId) &&
+    isFiniteNumber(value.purchaseId) &&
+    typeof value.claimerName === "string" &&
+    typeof value.courseTitle === "string" &&
+    isFiniteNumber(value.seatsLeft) &&
+    isSameSitePath(value.url)
+  );
+}
+
+export function isNewEnrollmentData(
+  value: unknown
+): value is NewEnrollmentData {
+  return (
+    isRecord(value) &&
+    isFiniteNumber(value.enrollmentId) &&
+    isFiniteNumber(value.courseId) &&
+    typeof value.studentName === "string" &&
+    typeof value.courseTitle === "string" &&
+    isSameSitePath(value.url)
+  );
+}
+
+function seatsLeftLabel(seatsLeft: number): string {
+  if (seatsLeft <= 0) return "No Seats left";
+  return seatsLeft === 1 ? "1 Seat left" : `${seatsLeft} Seats left`;
 }
