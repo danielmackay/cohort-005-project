@@ -110,7 +110,7 @@ export function knockNotifications(config: KnockServerConfig): Notifications {
       await knock.users.update(id, properties);
 
       const missing = defaultsForMissingCategories(
-        await existingPreferenceCategories(knock, id)
+        await existingPreferenceCategories(knock, id, config.feedChannelId)
       );
       if (Object.keys(missing).length === 0) return;
 
@@ -157,21 +157,40 @@ export function knockNotifications(config: KnockServerConfig): Notifications {
 const PREFERENCE_SET = "default";
 
 /**
- * The categories the user's preference set already names.
+ * The categories in the user's preference set that hold a choice made for this
+ * user.
  *
  * Checked against Knock Development: an unknown user gets 404, and an
- * identified user's set always comes back with the environment default (set in
- * the Knock dashboard) merged in, indistinguishable from the user's own
- * choices. So a category the environment default covers counts as already set
- * and is left to that default.
+ * identified user's set comes back with the environment default (set in the
+ * Knock dashboard) merged in. That default arrives by channel type, while
+ * Cadence writes every per-user choice by channel id. Only the channel id
+ * counts, so Cadence's own defaults still get written for a category the
+ * dashboard default happens to cover: that default is not to be relied on.
  */
+export function categoriesTheUserHasSet(
+  categories: KnockCategories,
+  feedChannelId: string
+): Set<string> {
+  const channelIds = Object.values(knockChannelIds(feedChannelId));
+  const set = new Set<string>();
+  for (const [category, setting] of Object.entries(categories ?? {})) {
+    if (typeof setting === "boolean") continue;
+    const hasChoice = channelIds.some(
+      (channelId) => typeof setting.channels?.[channelId] === "boolean"
+    );
+    if (hasChoice) set.add(category);
+  }
+  return set;
+}
+
 async function existingPreferenceCategories(
   knock: Knock,
-  knockUserId: string
+  knockUserId: string,
+  feedChannelId: string
 ): Promise<Set<string>> {
   try {
     const set = await knock.users.getPreferences(knockUserId, PREFERENCE_SET);
-    return new Set(Object.keys(set.categories ?? {}));
+    return categoriesTheUserHasSet(set.categories, feedChannelId);
   } catch (error) {
     if (error instanceof NotFoundError) return new Set();
     throw error;
@@ -204,7 +223,9 @@ function isNotificationCategory(value: string): value is NotificationCategory {
  * A category can hold a choice in two shapes: by channel id, which is how
  * Cadence writes, and by channel type, which is how the environment default
  * set in the Knock dashboard arrives (Enrollments off). The channel id is the
- * more specific, so it wins. A setting with conditions instead of a plain
+ * more specific, so it wins. The channel type is still read, because until
+ * syncUser has written Cadence's defaults it is what Knock delivers by; it
+ * never counts as the user's own choice (see categoriesTheUserHasSet). A setting with conditions instead of a plain
  * on/off isn't something Cadence writes, so it reads as no choice and the
  * default applies.
  */

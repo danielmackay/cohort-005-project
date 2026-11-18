@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { fromKnockCategories } from "./knock-notifications.server";
+import {
+  categoriesTheUserHasSet,
+  fromKnockCategories,
+} from "./knock-notifications.server";
 
 const FEED = "feed-channel-id";
 
@@ -52,5 +55,46 @@ describe("fromKnockCategories", () => {
         FEED
       )
     ).toEqual({});
+  });
+});
+
+describe("categoriesTheUserHasSet", () => {
+  it("counts a category Cadence stored by the feed's channel id", () => {
+    expect(
+      categoriesTheUserHasSet(
+        { "discussion-replies": { channels: { [FEED]: false } } },
+        FEED
+      )
+    ).toEqual(new Set(["discussion-replies"]));
+  });
+
+  it("does not count a category only the environment default covers", () => {
+    expect(
+      categoriesTheUserHasSet(
+        {
+          enrollments: { channel_types: { in_app_feed: false } },
+          "seat-claims": true,
+        },
+        FEED
+      )
+    ).toEqual(new Set());
+  });
+
+  it("counts a category set by channel id even when the environment default also covers it", () => {
+    expect(
+      categoriesTheUserHasSet(
+        {
+          enrollments: {
+            channels: { [FEED]: true },
+            channel_types: { in_app_feed: false },
+          },
+        },
+        FEED
+      )
+    ).toEqual(new Set(["enrollments"]));
+  });
+
+  it("counts nothing for a set with no categories", () => {
+    expect(categoriesTheUserHasSet(null, FEED)).toEqual(new Set());
   });
 });
