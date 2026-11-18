@@ -258,7 +258,7 @@ describe("describeNotification for Refund Requests", () => {
         })
       )
     ).toEqual({
-      title: "Your refund for JS Basics was approved",
+      title: "Your refund request for JS Basics was approved",
       snippet: "$79.00 is on its way back to you. Sorry it wasn't for you.",
       href: "/settings#refund-requests",
       icon: "refund",

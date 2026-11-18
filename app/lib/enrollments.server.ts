@@ -67,7 +67,7 @@ export function insertEnrollment(
     return {
       ok: false,
       status: 409,
-      error: "User is already enrolled in this course",
+      error: "Student is already enrolled in this course",
     };
   }
 

@@ -113,7 +113,7 @@ describe("claimSeat", () => {
     ).toEqual({
       ok: false,
       status: 404,
-      error: "Coupon not found",
+      error: "Seat not found",
     });
   });
 
@@ -135,7 +135,7 @@ describe("claimSeat", () => {
     ).toEqual({
       ok: false,
       status: 409,
-      error: "Coupon has already been redeemed",
+      error: "This Seat has already been claimed",
     });
     expect(enrollmentCount()).toBe(1);
   });
@@ -206,7 +206,7 @@ describe("claimSeat", () => {
       ok: false,
       status: 403,
       error:
-        "This coupon can only be redeemed from the same country as the purchaser",
+        "This Seat can only be claimed from the same country as the purchaser",
     });
     expect(getSeat("SEAT-1")?.redeemedAt).toBeNull();
   });

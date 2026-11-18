@@ -414,7 +414,7 @@ const ROW_RENDERERS: { [T in NotificationType]: RowRenderer<T> } = {
     text: (data) => {
       const onItsWay = `${formatPrice(data.amountPaid)} is on its way back to you.`;
       return {
-        title: `Your refund for ${data.courseTitle} was approved`,
+        title: `Your refund request for ${data.courseTitle} was approved`,
         snippet: toSnippet(
           data.decisionNote ? `${onItsWay} ${data.decisionNote}` : onItsWay
         ),

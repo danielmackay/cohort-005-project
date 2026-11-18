@@ -113,8 +113,13 @@ export async function action({ request }: Route.ActionArgs) {
       name,
       email
     );
-    if (!result.ok) {
+    // A taken email is the admin's to fix in the form, so it comes back as a
+    // form error. A missing user is not, so it throws.
+    if (!result.ok && result.status === 409) {
       return data({ error: result.error }, { status: result.status });
+    }
+    if (!result.ok) {
+      throw data(result.error, { status: result.status });
     }
     return { success: true };
   }

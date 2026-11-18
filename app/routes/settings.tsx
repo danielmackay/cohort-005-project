@@ -109,6 +109,9 @@ export async function action({ request }: Route.ActionArgs) {
       preference.data.category,
       preference.data.enabled === "true"
     );
+    // Returned, not thrown: the switch is a fetcher that must toast the error
+    // and revert to its saved state, and a thrown response would replace the
+    // whole page with the error boundary instead.
     if (!result.ok) {
       return data(
         { ok: false as const, error: result.error },
