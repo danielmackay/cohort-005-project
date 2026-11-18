@@ -1,6 +1,6 @@
 {
   "name": "Refund Request approved",
-  "description": "Notification 1: tells the buyer a Platform Admin approved their Refund Request, with the decision note if there is one. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "description": "Refund Request approved Notification: tells the buyer a Platform Admin approved their Refund Request, with the decision note if there is one. Cadence renders the row text from the trigger data; the template is only a fallback.",
   "categories": ["refund-request-updates"],
   "trigger_frequency": "every_trigger",
   "steps": [

@@ -1,6 +1,6 @@
 {
   "name": "Discussion Question",
-  "description": "Notification 6: someone other than the course's Instructor asked a Discussion Question on one of its lessons. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "description": "Discussion Question Notification: someone other than the course's Instructor asked a Discussion Question on one of its lessons. Cadence renders the row text from the trigger data; the template is only a fallback.",
   "categories": ["discussion-questions"],
   "trigger_frequency": "every_trigger",
   "steps": [

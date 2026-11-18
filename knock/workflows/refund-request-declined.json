@@ -1,6 +1,6 @@
 {
   "name": "Refund Request declined",
-  "description": "Notification 2: tells the buyer a Platform Admin declined their Refund Request, with the decision note and that they can ask again. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "description": "Refund Request declined Notification: tells the buyer a Platform Admin declined their Refund Request, with the decision note and that they can ask again. Cadence renders the row text from the trigger data; the template is only a fallback.",
   "categories": ["refund-request-updates"],
   "trigger_frequency": "every_trigger",
   "steps": [

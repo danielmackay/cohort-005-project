@@ -74,57 +74,56 @@ export interface Notifications {
 }
 
 /**
- * Sends a Notification after a domain write has committed. A failure is logged
- * and swallowed on purpose: a vendor outage must never fail or roll back the
- * action that caused the Notification. There are no retries.
+ * Runs one port call after the domain write that caused it has committed.
+ *
+ * NOTE: [2026-11-18] DM - Failures are logged and swallowed on purpose, so a
+ * Knock outage never fails or rolls back the domain action. v1 has no retries:
+ * a Notification lost to an outage stays lost.
  */
-export async function notifyAfterCommit<T extends NotificationType>(
+async function afterCommit(
+  failureMessage: string,
+  call: () => Promise<void>
+): Promise<void> {
+  try {
+    await call();
+  } catch (error) {
+    console.error(`[notifications] ${failureMessage}`, error);
+  }
+}
+
+/** Sends a Notification after a domain write has committed. */
+export function notifyAfterCommit<T extends NotificationType>(
   notifications: Notifications,
   notification: OutgoingNotification<T>
 ): Promise<void> {
-  try {
-    await notifications.notify(notification);
-  } catch (error) {
-    console.error(
-      `[notifications] Failed to send ${notification.type} (${notification.idempotencyKey})`,
-      error
-    );
-  }
+  return afterCommit(
+    `Failed to send ${notification.type} (${notification.idempotencyKey})`,
+    () => notifications.notify(notification)
+  );
 }
 
-/**
- * Archives a comment's Notifications after its soft delete has committed.
- * Like notifyAfterCommit, a failure is logged and never fails the delete.
- */
-export async function archiveForCommentAfterCommit(
+/** Archives a comment's Notifications after its soft delete has committed. */
+export function archiveForCommentAfterCommit(
   notifications: Notifications,
   commentId: number
 ): Promise<void> {
-  try {
-    await notifications.archiveForComment(commentId);
-  } catch (error) {
-    console.error(
-      `[notifications] Failed to archive Notifications for comment ${commentId}`,
-      error
-    );
-  }
+  return afterCommit(
+    `Failed to archive Notifications for comment ${commentId}`,
+    () => notifications.archiveForComment(commentId)
+  );
 }
 
 /**
- * Syncs a user after their row has been written. Like `notifyAfterCommit`, a
- * failure is logged and swallowed: a vendor outage must never fail signup or a
- * profile edit. Triggers identify their recipients inline, so a user whose
- * sync failed still receives Notifications.
+ * Syncs a user after their row has been written. Triggers identify their
+ * recipients inline, so a user whose sync failed still receives Notifications.
  */
-export async function syncUserAfterCommit(
+export function syncUserAfterCommit(
   notifications: Notifications,
   user: NotificationUser
 ): Promise<void> {
-  try {
-    await notifications.syncUser(user);
-  } catch (error) {
-    console.error(`[notifications] Failed to sync user ${user.id}`, error);
-  }
+  return afterCommit(`Failed to sync user ${user.id}`, () =>
+    notifications.syncUser(user)
+  );
 }
 
 // ─── No-op adapter ───

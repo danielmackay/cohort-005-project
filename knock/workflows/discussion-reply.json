@@ -1,6 +1,6 @@
 {
   "name": "Discussion Reply",
-  "description": "Notification 7: someone replied to a Discussion Question the recipient asked. Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "description": "Discussion Reply Notification: someone replied to a Discussion Question the recipient asked. Cadence renders the row text from the trigger data; the template is only a fallback.",
   "categories": ["discussion-replies"],
   "trigger_frequency": "every_trigger",
   "steps": [

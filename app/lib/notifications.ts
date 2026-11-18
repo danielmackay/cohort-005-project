@@ -135,7 +135,7 @@ export type DiscussionQuestionData = {
 // Refund Request trigger data. Amounts are integer cents, as stored, so the
 // row can format them the same way the rest of Cadence does.
 
-/** Notification 8: the buyer's own Refund Request is waiting on a decision. */
+/** Refund Request confirmation Notification: the buyer's own Refund Request is waiting on a decision. */
 export type RefundRequestConfirmationData = {
   refundRequestId: number;
   purchaseId: number;
@@ -143,7 +143,7 @@ export type RefundRequestConfirmationData = {
   amountPaid: number;
 };
 
-/** Notification 3: a new Open Refund Request for a Platform Admin to decide. */
+/** Open Refund Request Notification: a new Open Refund Request for a Platform Admin to decide. */
 export type OpenRefundRequestData = {
   refundRequestId: number;
   purchaseId: number;
@@ -156,7 +156,7 @@ export type OpenRefundRequestData = {
   url: string;
 };
 
-/** Notification 1: the buyer's Refund Request was approved. */
+/** Refund Request approved Notification: the buyer's Refund Request was approved. */
 export type RefundRequestApprovedData = {
   refundRequestId: number;
   purchaseId: number;
@@ -166,7 +166,7 @@ export type RefundRequestApprovedData = {
   url: string;
 };
 
-/** Notification 2: the buyer's Refund Request was declined. A note is required. */
+/** Refund Request declined Notification: the buyer's Refund Request was declined. A note is required. */
 export type RefundRequestDeclinedData = {
   refundRequestId: number;
   purchaseId: number;
@@ -176,7 +176,7 @@ export type RefundRequestDeclinedData = {
   url: string;
 };
 
-/** Notification 4: a Seat on the Team Admin's Team Licence was claimed. */
+/** Seat claimed Notification: a Seat on the Team Admin's Team Licence was claimed. */
 export type SeatClaimedData = {
   seatId: number;
   purchaseId: number;
@@ -189,7 +189,7 @@ export type SeatClaimedData = {
   url: string;
 };
 
-/** Notification 5: a Student enrolled in the Instructor's course. */
+/** New Enrollment Notification: a Student enrolled in the Instructor's course. */
 export type NewEnrollmentData = {
   enrollmentId: number;
   courseId: number;

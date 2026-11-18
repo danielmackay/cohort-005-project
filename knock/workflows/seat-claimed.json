@@ -1,6 +1,6 @@
 {
   "name": "Seat Claimed",
-  "description": "Notification 4: tells the Team Admin who owns a Team Licence that one of its Seats was claimed (who, the course and how many Seats are left). Cadence renders the row text; the template is only a fallback.",
+  "description": "Seat claimed Notification: tells the Team Admin who owns a Team Licence that one of its Seats was claimed (who, the course and how many Seats are left). Cadence renders the row text; the template is only a fallback.",
   "categories": ["seat-claims"],
   "trigger_frequency": "every_trigger",
   "steps": [

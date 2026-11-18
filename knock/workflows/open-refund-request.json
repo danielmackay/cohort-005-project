@@ -1,6 +1,6 @@
 {
   "name": "Open Refund Request",
-  "description": "Notification 3: tells every Platform Admin about a new Open Refund Request (who asked, the course, the amount and the reason). Cadence renders the row text from the trigger data; the template is only a fallback.",
+  "description": "Open Refund Request Notification: tells every Platform Admin about a new Open Refund Request (who asked, the course, the amount and the reason). Cadence renders the row text from the trigger data; the template is only a fallback.",
   "categories": ["open-refund-requests"],
   "trigger_frequency": "every_trigger",
   "steps": [

@@ -1,6 +1,6 @@
 {
   "name": "Refund Request confirmation",
-  "description": "Notification 8: confirms to the buyer that their Refund Request was raised and is under review. Sent by Cadence itself, so there is no actor. Cadence renders the row text from the trigger data, with no link; the template is only a fallback, and Knock requires its action_url.",
+  "description": "Refund Request confirmation Notification: confirms to the buyer that their Refund Request was raised and is under review. Sent by Cadence itself, so there is no actor. Cadence renders the row text from the trigger data, with no link; the template is only a fallback, and Knock requires its action_url.",
   "categories": ["refund-request-updates"],
   "trigger_frequency": "every_trigger",
   "steps": [
