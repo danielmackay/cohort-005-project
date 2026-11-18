@@ -1,4 +1,13 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { alias } from "drizzle-orm/sqlite-core";
 import * as schema from "~/db/schema";
@@ -17,6 +26,16 @@ import {
   RefundStatus,
 } from "~/db/schema";
 import { formatPrice } from "~/lib/utils";
+import {
+  BUYER_REFUND_REQUESTS_URL,
+  NotificationType,
+  OPEN_REFUND_REQUESTS_URL,
+} from "~/lib/notifications";
+import {
+  notifyAfterCommit,
+  type NotificationUser,
+  type Notifications,
+} from "~/lib/notifications.server";
 import {
   REFUND_COMPLETION_LIMIT,
   REFUND_WATCH_LIMIT_SECONDS,
@@ -215,8 +234,7 @@ function getRefundFigures(db: Queryable, purchase: Purchase): RefundFigures {
 /** What the buyer is told when they can't raise a Refund Request. */
 const RULE_BREAK_ERRORS: Record<RuleBreak, string> = {
   window_closed: `The ${REFUND_WINDOW_DAYS}-day window has closed.`,
-  watched_too_much:
-    "You have watched too much of this course to get a refund.",
+  watched_too_much: "You have watched too much of this course to get a refund.",
   completed_too_much:
     "You have completed too much of this course to request a refund.",
   seat_claimed: "A Team Licence with a claimed Seat cannot be refunded.",
@@ -259,7 +277,11 @@ function findRuleBreaks(
 
 // ─── Raising a Refund Request ───
 
-export type Failure = { ok: false; status: 400 | 403 | 404 | 409; error: string };
+export type Failure = {
+  ok: false;
+  status: 400 | 403 | 404 | 409;
+  error: string;
+};
 
 type RefundCheck = { ok: true; purchase: Purchase } | Failure;
 
@@ -354,13 +376,19 @@ export type RaiseResult =
   | { ok: true; refundRequestId: number; kind: PurchaseKind; email: Email }
   | Failure;
 
-export function raiseRefundRequest(
+/**
+ * Raises a Refund Request on a Purchase. Once it is saved, the buyer gets the
+ * Refund Request confirmation and every Platform Admin gets an Open Refund
+ * Request Notification. The returned email is sent by the caller.
+ */
+export async function raiseRefundRequest(
   db: Db,
+  notifications: Notifications,
   purchaseId: number,
   buyerId: number,
   reason: string,
   now: Date
-): RaiseResult {
+): Promise<RaiseResult> {
   const check = checkRefundRequest(db, purchaseId, buyerId, now);
   if (!check.ok) return check;
 
@@ -386,6 +414,14 @@ export function raiseRefundRequest(
     })
     .returning()
     .get();
+
+  await notifyRefundRequestRaised(db, notifications, {
+    refundRequestId: refundRequest.id,
+    purchase,
+    buyer,
+    courseTitle: course.title,
+    reason,
+  });
 
   return {
     ok: true,
@@ -500,7 +536,8 @@ export function listRefundRequestsForReview(
       // A Claimed Seat belongs to another student, so the only way out of
       // that request is a decline. See docs/adr/0003.
       canApprove:
-        row.status === RefundStatus.Open && !ruleBreaks.includes("seat_claimed"),
+        row.status === RefundStatus.Open &&
+        !ruleBreaks.includes("seat_claimed"),
     };
   });
 }
@@ -570,6 +607,10 @@ export function listTeamLicences(db: Queryable, buyerId: number, now: Date) {
 
 export type DecisionResult = { ok: true; email: Email } | Failure;
 
+// What a decision's transaction hands back, so the Notification can be sent
+// once it has committed.
+type Decided = { ok: true; email: Email; purchase: Purchase } | Failure;
+
 function findOpenRefundRequest(
   tx: Queryable,
   refundRequestId: number
@@ -610,15 +651,18 @@ function findOpenRefundRequest(
  *   (docs/adr/0001).
  * - A Team Licence: its Unclaimed Seats can never be claimed. Refused if any
  *   Seat has been claimed (docs/adr/0003).
+ *
+ * Once it commits, the buyer gets a Notification with the decision note.
  */
-export function approveRefundRequest(
+export async function approveRefundRequest(
   db: Db,
+  notifications: Notifications,
   refundRequestId: number,
   platformAdminId: number,
   note: string | null,
   now: Date
-): DecisionResult {
-  return db.transaction((tx): DecisionResult => {
+): Promise<DecisionResult> {
+  const decided = db.transaction((tx): Decided => {
     const found = findOpenRefundRequest(tx, refundRequestId);
     if (!found.ok) return found;
 
@@ -680,22 +724,37 @@ export function approveRefundRequest(
     return {
       ok: true,
       email: buildDecisionEmail(tx, purchase, RefundStatus.Approved, note),
+      purchase,
     };
   });
+  if (!decided.ok) return decided;
+
+  await notifyRefundRequestDecided(db, notifications, {
+    decision: RefundStatus.Approved,
+    refundRequestId,
+    purchase: decided.purchase,
+    platformAdminId,
+    note,
+  });
+
+  return { ok: true, email: decided.email };
 }
 
 /**
  * Declines an Open Refund Request. Nothing the Purchase granted is lost, and
  * the buyer may raise a new Refund Request. The note is required: it is how
  * the buyer learns whether another request is worth raising.
+ *
+ * Once it commits, the buyer gets a Notification with the note.
  */
-export function declineRefundRequest(
+export async function declineRefundRequest(
   db: Db,
+  notifications: Notifications,
   refundRequestId: number,
   platformAdminId: number,
   note: string,
   now: Date
-): DecisionResult {
+): Promise<DecisionResult> {
   const trimmedNote = note.trim();
 
   if (trimmedNote.length === 0) {
@@ -706,7 +765,7 @@ export function declineRefundRequest(
     };
   }
 
-  return db.transaction((tx): DecisionResult => {
+  const decided = db.transaction((tx): Decided => {
     const found = findOpenRefundRequest(tx, refundRequestId);
     if (!found.ok) return found;
 
@@ -728,8 +787,20 @@ export function declineRefundRequest(
         RefundStatus.Declined,
         trimmedNote
       ),
+      purchase: found.purchase,
     };
   });
+  if (!decided.ok) return decided;
+
+  await notifyRefundRequestDecided(db, notifications, {
+    decision: RefundStatus.Declined,
+    refundRequestId,
+    purchase: decided.purchase,
+    platformAdminId,
+    note: trimmedNote,
+  });
+
+  return { ok: true, email: decided.email };
 }
 
 /** The email the buyer gets once their Refund Request is decided. */
@@ -778,4 +849,147 @@ function buildDecisionEmail(
       "— The Cadence team",
     ].join("\n"),
   };
+}
+
+// ─── Refund Request Notifications ───
+// Sent only after the domain write has committed, through notifyAfterCommit, so
+// a failing port never changes the outcome or the email the caller sends.
+
+function toNotificationUser(user: typeof users.$inferSelect): NotificationUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+  };
+}
+
+function getNotificationUser(
+  db: Queryable,
+  userId: number
+): NotificationUser | undefined {
+  const user = db.select().from(users).where(eq(users.id, userId)).get();
+  return user ? toNotificationUser(user) : undefined;
+}
+
+async function notifyRefundRequestRaised(
+  db: Queryable,
+  notifications: Notifications,
+  raised: {
+    refundRequestId: number;
+    purchase: Purchase;
+    buyer: typeof users.$inferSelect;
+    courseTitle: string;
+    reason: string;
+  }
+) {
+  const { refundRequestId, purchase, buyer, courseTitle, reason } = raised;
+  const buyerUser = toNotificationUser(buyer);
+
+  // The confirmation comes from Cadence itself, so it has no sender.
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.RefundRequestConfirmation,
+    recipients: [buyerUser],
+    sender: null,
+    data: {
+      refundRequestId,
+      purchaseId: purchase.id,
+      courseTitle,
+      amountPaid: purchase.amountPaid,
+    },
+    idempotencyKey: `${NotificationType.RefundRequestConfirmation}:${refundRequestId}`,
+  });
+
+  // Looked up as it fires, so a newly promoted Platform Admin is included with
+  // no setup. A Platform Admin raising their own Refund Request isn't told
+  // about it: Notifications are only for what someone else did.
+  const platformAdmins = db
+    .select()
+    .from(users)
+    .where(eq(users.role, schema.UserRole.Admin))
+    .orderBy(asc(users.id))
+    .all()
+    .filter((admin) => admin.id !== buyer.id)
+    .map(toNotificationUser);
+
+  if (platformAdmins.length === 0) return;
+
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.OpenRefundRequest,
+    recipients: platformAdmins,
+    sender: buyerUser,
+    data: {
+      refundRequestId,
+      purchaseId: purchase.id,
+      buyerName: buyer.name,
+      courseTitle,
+      amountPaid: purchase.amountPaid,
+      reason,
+      url: OPEN_REFUND_REQUESTS_URL,
+    },
+    idempotencyKey: `${NotificationType.OpenRefundRequest}:${refundRequestId}`,
+  });
+}
+
+type RefundRequestDecision =
+  | { decision: RefundStatus.Approved; note: string | null }
+  | { decision: RefundStatus.Declined; note: string };
+
+// Deciding one Open Refund Request leaves every Platform Admin's Open Refund
+// Request Notification as it is: the feed is a history, not a to-do list.
+async function notifyRefundRequestDecided(
+  db: Queryable,
+  notifications: Notifications,
+  decided: RefundRequestDecision & {
+    refundRequestId: number;
+    purchase: Purchase;
+    platformAdminId: number;
+  }
+) {
+  const { refundRequestId, purchase, platformAdminId } = decided;
+  const buyer = getNotificationUser(db, purchase.userId);
+  const platformAdmin = getNotificationUser(db, platformAdminId);
+  const course = db
+    .select({ title: courses.title })
+    .from(courses)
+    .where(eq(courses.id, purchase.courseId))
+    .get();
+
+  if (!buyer || !course) {
+    console.error(
+      `[notifications] Not sending the decision on Refund Request ${refundRequestId}: ` +
+        `buyer ${purchase.userId} or course ${purchase.courseId} not found`
+    );
+    return;
+  }
+
+  const common = {
+    refundRequestId,
+    purchaseId: purchase.id,
+    courseTitle: course.title,
+    amountPaid: purchase.amountPaid,
+    url: BUYER_REFUND_REQUESTS_URL,
+  };
+  // A Platform Admin missing by now still leaves the buyer told, just without
+  // a sender.
+  const sender = platformAdmin ?? null;
+
+  if (decided.decision === RefundStatus.Approved) {
+    await notifyAfterCommit(notifications, {
+      type: NotificationType.RefundRequestApproved,
+      recipients: [buyer],
+      sender,
+      data: { ...common, decisionNote: decided.note },
+      idempotencyKey: `${NotificationType.RefundRequestApproved}:${refundRequestId}`,
+    });
+    return;
+  }
+
+  await notifyAfterCommit(notifications, {
+    type: NotificationType.RefundRequestDeclined,
+    recipients: [buyer],
+    sender,
+    data: { ...common, decisionNote: decided.note },
+    idempotencyKey: `${NotificationType.RefundRequestDeclined}:${refundRequestId}`,
+  });
 }
