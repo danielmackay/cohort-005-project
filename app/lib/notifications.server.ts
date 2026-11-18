@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import type {
   FeedConnection,
+  NotificationCategory,
+  NotificationChannel,
   NotificationData,
+  NotificationPreferences,
   NotificationType,
 } from "~/lib/notifications";
 
@@ -56,6 +59,18 @@ export interface Notifications {
    * has no preference for yet. Never overwrites an existing preference.
    */
   syncUser(user: NotificationUser): Promise<void>;
+  /**
+   * The user's stored Notification preferences. A category or channel with no
+   * stored preference is missing, so the caller applies Cadence's default.
+   */
+  getPreferences(userId: number): Promise<NotificationPreferences>;
+  /** Sets one category on one channel, leaving every other preference alone. */
+  setPreference(
+    userId: number,
+    category: NotificationCategory,
+    channel: NotificationChannel,
+    enabled: boolean
+  ): Promise<void>;
 }
 
 /**
@@ -138,6 +153,17 @@ export function loggingNotifications(
     async syncUser(user) {
       log(
         `[notifications] Knock is not configured; not syncing user ${user.id}`
+      );
+    },
+    async getPreferences() {
+      // Nothing is stored anywhere, so every category shows its default.
+      return {};
+    },
+    async setPreference() {
+      // Thrown rather than logged: pretending to save would show a switch that
+      // snaps back on the next reload.
+      throw new Error(
+        "Knock is not configured, so Notification preferences can't be saved"
       );
     },
   };

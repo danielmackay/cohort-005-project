@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { NOTIFICATION_SETTINGS_ID } from "~/components/notification-settings-card";
 import { Popover } from "radix-ui";
 import {
   Bell,
@@ -7,6 +8,7 @@ import {
   GraduationCap,
   MessageSquare,
   Receipt,
+  Settings,
   UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -297,6 +299,15 @@ export function NotificationBell({
             >
               Mark all as read
             </button>
+            <Link
+              to={`/settings#${NOTIFICATION_SETTINGS_ID}`}
+              onClick={() => setOpen(false)}
+              aria-label="Notification settings"
+              title="Notification settings"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Settings className="size-4" />
+            </Link>
           </div>
           <FeedList feed={feed} close={() => setOpen(false)} />
         </Popover.Content>

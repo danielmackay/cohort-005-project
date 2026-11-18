@@ -19,10 +19,24 @@ import { formatPrice } from "~/lib/utils";
 import { listRefundRequestsForBuyer } from "~/lib/refunds.server";
 import { updateProfile } from "~/lib/users.server";
 import { defaultNotifications } from "~/lib/notifications.server";
+import { NotificationCategory } from "~/lib/notifications";
+import {
+  getNotificationSettings,
+  setNotificationPreference,
+} from "~/lib/notification-preferences.server";
+import {
+  NotificationSettingsCard,
+  SET_NOTIFICATION_PREFERENCE,
+} from "~/components/notification-settings-card";
 
 const settingsSchema = z.object({
   name: z.string().trim().min(1, "Name cannot be empty."),
   bio: z.string().trim().optional(),
+});
+
+const notificationPreferenceSchema = z.object({
+  category: z.nativeEnum(NotificationCategory),
+  enabled: z.enum(["true", "false"]),
 });
 
 export function meta() {
@@ -52,8 +66,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const refundRequests = listRefundRequestsForBuyer(db, currentUserId);
+  const notificationSettings = await getNotificationSettings(
+    db,
+    await defaultNotifications(),
+    currentUserId
+  );
 
   return {
+    notificationSettings,
     user: {
       id: currentUser.id,
       name: currentUser.name,
@@ -73,6 +93,31 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const formData = await request.formData();
+
+  if (formData.get("intent") === SET_NOTIFICATION_PREFERENCE) {
+    const preference = parseFormData(formData, notificationPreferenceSchema);
+    if (!preference.success) {
+      return data(
+        { ok: false as const, error: "That setting couldn't be saved." },
+        { status: 400 }
+      );
+    }
+    const result = await setNotificationPreference(
+      db,
+      await defaultNotifications(),
+      currentUserId,
+      preference.data.category,
+      preference.data.enabled === "true"
+    );
+    if (!result.ok) {
+      return data(
+        { ok: false as const, error: result.error },
+        { status: result.status }
+      );
+    }
+    return { ok: true as const };
+  }
+
   const parsed = parseFormData(formData, settingsSchema);
 
   if (!parsed.success) {
@@ -95,7 +140,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Settings({ loaderData }: Route.ComponentProps) {
-  const { user, refundRequests } = loaderData;
+  const { user, refundRequests, notificationSettings } = loaderData;
   const openCount = refundRequests.filter(
     (refundRequest) => refundRequest.status === RefundStatus.Open
   ).length;
@@ -184,6 +229,8 @@ export default function Settings({ loaderData }: Route.ComponentProps) {
           </fetcher.Form>
         </CardContent>
       </Card>
+
+      <NotificationSettingsCard settings={notificationSettings} />
 
       {refundRequests.length > 0 && (
         <Card id="refund-requests" className="mt-8 max-w-md">

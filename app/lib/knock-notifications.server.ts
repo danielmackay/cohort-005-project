@@ -1,5 +1,6 @@
 import Knock, { NotFoundError, signUserToken } from "@knocklabs/node";
 import {
+  NotificationCategory,
   NotificationChannel,
   defaultsForMissingCategories,
   type NotificationPreferences,
@@ -118,6 +119,34 @@ export function knockNotifications(config: KnockServerConfig): Notifications {
         categories: toKnockCategories(missing, config.feedChannelId),
       });
     },
+
+    async getPreferences(userId) {
+      try {
+        const set = await knock.users.getPreferences(
+          knockUserId(userId),
+          PREFERENCE_SET
+        );
+        return fromKnockCategories(set.categories, config.feedChannelId);
+      } catch (error) {
+        // A user Knock has never seen has nothing stored: every default applies.
+        if (error instanceof NotFoundError) return {};
+        throw error;
+      }
+    },
+
+    async setPreference(userId, category, channel, enabled) {
+      await knock.users.setPreferences(knockUserId(userId), PREFERENCE_SET, {
+        // Checked against Knock Development: merge deep-merges this one
+        // category's channel into the set, leaving other categories and this
+        // category's other channels (including the environment default's
+        // channel type) as they were.
+        __persistence_strategy__: "merge",
+        categories: toKnockCategories(
+          { [category]: { [channel]: enabled } },
+          config.feedChannelId
+        ),
+      });
+    },
   };
 }
 
@@ -152,6 +181,55 @@ function knockChannelIds(
   feedChannelId: string
 ): Record<NotificationChannel, string> {
   return { [NotificationChannel.Feed]: feedChannelId };
+}
+
+/** Knock's channel type for each Cadence channel. */
+const KNOCK_CHANNEL_TYPE = {
+  [NotificationChannel.Feed]: "in_app_feed",
+} as const satisfies Record<NotificationChannel, string>;
+
+type KnockCategories = Awaited<
+  ReturnType<Knock["users"]["getPreferences"]>
+>["categories"];
+
+function isNotificationCategory(value: string): value is NotificationCategory {
+  return Object.values<string>(NotificationCategory).includes(value);
+}
+
+/**
+ * Reads a Knock preference set's categories back into Cadence's terms.
+ *
+ * A category can hold a choice in two shapes: by channel id, which is how
+ * Cadence writes, and by channel type, which is how the environment default
+ * set in the Knock dashboard arrives (Enrollments off). The channel id is the
+ * more specific, so it wins. A setting with conditions instead of a plain
+ * on/off isn't something Cadence writes, so it reads as no choice and the
+ * default applies.
+ */
+export function fromKnockCategories(
+  categories: KnockCategories,
+  feedChannelId: string
+): NotificationPreferences {
+  const channelIds = knockChannelIds(feedChannelId);
+  const preferences: NotificationPreferences = {};
+
+  for (const [category, setting] of Object.entries(categories ?? {})) {
+    if (!isNotificationCategory(category)) continue;
+
+    const byChannel: Partial<Record<NotificationChannel, boolean>> = {};
+    for (const channel of Object.values(NotificationChannel)) {
+      if (typeof setting === "boolean") {
+        byChannel[channel] = setting;
+        continue;
+      }
+      const byId = setting.channels?.[channelIds[channel]];
+      const byType = setting.channel_types?.[KNOCK_CHANNEL_TYPE[channel]];
+      if (typeof byId === "boolean") byChannel[channel] = byId;
+      else if (typeof byType === "boolean") byChannel[channel] = byType;
+    }
+    if (Object.keys(byChannel).length > 0) preferences[category] = byChannel;
+  }
+  return preferences;
 }
 
 function isNotificationChannel(value: string): value is NotificationChannel {

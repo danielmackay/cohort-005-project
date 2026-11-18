@@ -60,5 +60,17 @@ export function createFakeNotifications(): FakeNotifications {
         ...defaultsForMissingCategories(new Set(Object.keys(existing))),
       });
     },
+    async getPreferences(userId) {
+      if (failure) throw failure;
+      return structuredClone(preferences.get(userId) ?? {});
+    },
+    async setPreference(userId, category, channel, enabled) {
+      if (failure) throw failure;
+      const existing = preferences.get(userId) ?? {};
+      preferences.set(userId, {
+        ...existing,
+        [category]: { ...existing[category], [channel]: enabled },
+      });
+    },
   };
 }
