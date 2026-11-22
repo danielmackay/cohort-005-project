@@ -2807,6 +2807,37 @@ This course is still in draft while the cluster examples are rewritten against t
 
   console.log("Created Marta's Refund Request on her Team Licence.");
 
+  // ─── Emma's Bookmarks and Notes ───
+  // Across both her courses, so the Saved page shows Lessons from more than one
+  // Course. The second note uses `#` and `*` to show it is plain text.
+
+  db.insert(schema.bookmarks)
+    .values([
+      { userId: students[0].id, lessonId: course1LessonIds[1], createdAt: daysAgo(9) },
+      { userId: students[0].id, lessonId: course2LessonIds[2], createdAt: daysAgo(3) },
+    ])
+    .run();
+  db.insert(schema.notes)
+    .values([
+      {
+        userId: students[0].id,
+        lessonId: course1LessonIds[1],
+        body: "Rewatch the bit on narrowing before the quiz.",
+        createdAt: daysAgo(9),
+        updatedAt: daysAgo(8),
+      },
+      {
+        userId: students[0].id,
+        lessonId: course2LessonIds[2],
+        body: "# PUT vs PATCH\n*PUT* replaces the whole thing, PATCH changes part of it.",
+        createdAt: daysAgo(3),
+        updatedAt: daysAgo(2),
+      },
+    ])
+    .run();
+
+  console.log("Created Emma's Bookmarks and Notes.");
+
   // ─── Flush watch events ───
   // Batched: the heartbeat makes these by far the largest table, and one
   // statement per row would dominate the seed's runtime.
@@ -2849,6 +2880,9 @@ This course is still in draft while the cluster examples are rewritten against t
   console.log(`  Enrollments: ${countRows(schema.enrollments)}`);
   console.log(`  Course ratings: ${countRows(schema.courseRatings)}`);
   console.log(`  Lesson comments: ${countRows(schema.comments)}`);
+  console.log(
+    `  Bookmarks: ${countRows(schema.bookmarks)}, notes: ${countRows(schema.notes)}`
+  );
   console.log(
     `  Lesson progress: ${countRows(schema.lessonProgress)} (${countRows(schema.lessonProgress, eq(schema.lessonProgress.status, LessonProgressStatus.Completed))} completed)`
   );
