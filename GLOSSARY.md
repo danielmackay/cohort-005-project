@@ -22,11 +22,23 @@ _Avoid_: Admin (on its own), the team, Staff
 A Student who buys and manages a Team Licence. A Team Admin has no say over Refund Requests.
 _Avoid_: Admin (on its own)
 
+**Course Staff**:
+The people who speak for and edit one course: its Instructor and any Platform Admin. Another course's Instructor is not Course Staff here.
+_Avoid_: Staff (on its own), Owner, Moderator
+
 ### Enrollment
 
 **Enrollment**:
 A Student's place on a course, which lets them take it. A Student has at most one Enrollment per course, whether it came from an Individual Purchase or a Claimed Seat.
 _Avoid_: Place on a course, Access
+
+**Course Access**:
+Whether a person may take a course's lessons: watch them, read them, discuss them and record progress on them. Course Staff always have it. A Student has it through an Enrollment, unless a PPP Block applies.
+_Avoid_: Access (on its own, which reads as Enrollment)
+
+**PPP Block**:
+A Student who bought at a regional discount loses Course Access while they are in a different country from the one they bought in. Full-price buyers are never blocked.
+_Avoid_: Geo-block, Region lock
 
 **Lapsed**:
 A Student who has lost their Enrollment on a course but still has progress on it.
