@@ -46,9 +46,11 @@ const RANGE_DAYS: Record<Exclude<AnalyticsRange, "all">, number> = {
  * cutoff is inside the range. Lives here rather than in the service because
  * panels built on other services have to agree with it.
  */
-export function rangeStart(range: AnalyticsRange): string | null {
+export function rangeStart(range: AnalyticsRange, now: Date): string | null {
   if (range === "all") return null;
-  return new Date(Date.now() - RANGE_DAYS[range] * 86_400_000).toISOString();
+  return new Date(
+    now.getTime() - RANGE_DAYS[range] * 86_400_000
+  ).toISOString();
 }
 
 const MONTHS = [
