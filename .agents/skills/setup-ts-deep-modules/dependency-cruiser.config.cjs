@@ -70,7 +70,10 @@ module.exports = {
       comment: "No dependency cycles. Scope to `^${R}/` if you want to allow cycles outside packages.",
       severity: "error",
       from: {},
-      to: { circular: true },
+      // A cycle held together only by `import type` edges is erased at compile
+      // time (e.g. an adapter importing its port's types while the port loads
+      // the adapter), so it cannot cause a load-order bug.
+      to: { circular: true, viaOnly: { dependencyTypesNot: ["type-only"] } },
     },
 
     // --- Layering (optional, off by default) ----------------------------------
@@ -87,6 +90,9 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: "node_modules" },
+    // Count `import type` too. Off by default, which lets callers reach a
+    // package's private types and silently widens its interface.
+    tsPreCompilationDeps: true,
     tsConfig: { fileName: "tsconfig.json" },
     enhancedResolveOptions: {
       extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],

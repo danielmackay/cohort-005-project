@@ -7,7 +7,7 @@ import { markdown } from "~/lib/text";
 import {
   getInstructorAnalytics,
   type AnalyticsViewer,
-} from "./instructor-analytics.server";
+} from "../index.server";
 
 // Noon UTC keeps every fixture on the same calendar day in local time and in
 // UTC, so the refund window (local days) and the chart (UTC days) agree.
@@ -216,7 +216,7 @@ function analytics(
   viewer: AnalyticsViewer,
   params: Record<string, string> = {}
 ) {
-  return getInstructorAnalytics(db, viewer, new URLSearchParams(params), NOW);
+  return getInstructorAnalytics(viewer, new URLSearchParams(params), NOW, db);
 }
 
 function asInstructor(params: Record<string, string> = {}) {
@@ -836,11 +836,11 @@ describe("refund exposure", () => {
     const params = new URLSearchParams();
 
     expect(
-      getInstructorAnalytics(db, viewer, params, aWeekLater).refundExposure
+      getInstructorAnalytics(viewer, params, aWeekLater, db).refundExposure
         .courses[0].daysLeft
     ).toBe(4);
     expect(
-      getInstructorAnalytics(db, viewer, params, twelveDaysLater).refundExposure
+      getInstructorAnalytics(viewer, params, twelveDaysLater, db).refundExposure
         .grossCents
     ).toBe(0);
   });

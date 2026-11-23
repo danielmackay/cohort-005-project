@@ -3,7 +3,14 @@
 Do these checks in this order before you report a change to `app/` as complete:
 
 1. `npm run typecheck`
-2. `npm run test`
+2. `npm run lint:boundaries`
+3. `npm run test`
+
+`npm run check` runs all three in order.
+
+## Modules
+
+`app/modules/` holds deep modules. Read [app/modules/README.md](./app/modules/README.md) before you add a module or import from one.
 
 ## When something breaks
 
