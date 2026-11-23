@@ -1,7 +1,8 @@
 import { data } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/api.video-tracking";
-import { getCurrentUserId } from "~/lib/session";
+import { courseAccess } from "~/modules/course-access/index.server";
+import { getViewer } from "~/modules/course-access/viewer.server";
 import { parseJsonBody } from "~/lib/validation";
 import { db } from "~/db";
 import { videoWatchEvents } from "~/db/schema";
@@ -13,10 +14,9 @@ const videoTrackingSchema = z.object({
 });
 
 export async function action({ request }: Route.ActionArgs) {
-  const currentUserId = await getCurrentUserId(request);
-  if (!currentUserId) {
-    throw data("Unauthorized", { status: 401 });
-  }
+  const viewer = await getViewer(request);
+  // Fail fast on a signed-out request before reading the body.
+  courseAccess.requireUserId(viewer);
 
   const parsed = await parseJsonBody(request, videoTrackingSchema);
 
@@ -25,6 +25,14 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const { lessonId, eventType, positionSeconds } = parsed.data;
+
+  // No course in this URL: Course Access finds it from the lesson. Watch time
+  // is Student progress, so Course Staff without an Enrollment record none.
+  const grant = courseAccess.requireLesson(viewer, { lessonId });
+  if (!grant.enrolled) {
+    throw data("Only enrolled Students record progress.", { status: 403 });
+  }
+  const currentUserId = grant.userId;
 
   db
     .insert(videoWatchEvents)
