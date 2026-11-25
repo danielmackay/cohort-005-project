@@ -24,13 +24,6 @@ Both switch the type checker off at the exact point you are least sure. If a
 value can be missing, narrow it with a check. If you cannot name the type,
 the shape is wrong — fix the shape.
 
-## Let the code explain itself
-
-Name and extract until a comment is unnecessary. A comment earns its place
-only for a _why_ the code cannot express: a constraint, a decision, a link to
-the ADR behind it. A comment that restates _what_ the code does goes stale the
-first time the code changes.
-
 ## Arrange tests through the module under test
 
 Test setup calls the module's own functions. When the function you need does
@@ -73,21 +66,6 @@ ended, and the learner kept the course.)
 
 Not four, not tabs.
 
-## Derive, do not store
-
-If a value can be worked out from another value you already hold, work it out.
-Storing it gives you two things that must agree, and one day they will not.
-
-```ts
-// Bad
-const [items, setItems] = useState(rows);
-const [count, setCount] = useState(rows.length);
-
-// Good
-const [items, setItems] = useState(rows);
-const count = items.length;
-```
-
 ## Check permission in the action, not only the loader
 
 A loader guard does not protect an action. They are separate requests. For a
@@ -115,12 +93,6 @@ Do not rely on automatic semicolon insertion.
 `Number("")` is `0`, and `0` is a valid id in most schemas. An empty
 `lessonId` once opened lesson 0 for every learner.
 
-## Prefer composition to configuration
-
-A function that takes a `mode` flag and branches on it is two functions that
-have not been separated yet. The same goes for a component with a `variant`
-prop that changes what it renders rather than how it looks.
-
 ## Money is stored in integer cents.
 
 Never a float. Floats cannot hold a tenth. Regional prices came out as
@@ -132,18 +104,9 @@ Never a float. Floats cannot hold a tenth. Regional prices came out as
 
 Git has it. Delete it.
 
-## Name a test for the behaviour, not the function
-
-`"refuses a refund after the window closes"`, not `"refund test 3"`.
-
 ## Use the design tokens
 
 Never a raw hex value. `text-muted-foreground`, not `#6b7280`.
-
-## Do not put a side effect in the render path
-
-Rendering is for working out what the output is, not for doing something.
-Anything that touches the outside world belongs in an effect or an action.
 
 ## Timestamps are stored as ISO strings in UTC
 
@@ -153,10 +116,6 @@ refund window closed a day early for learners in Sydney before this.
 ## Use `===`, never `==`
 
 `==` coerces, and the coercion table is not something anybody remembers.
-
-## A pull request does one thing
-
-If the title needs an "and", it is two pull requests.
 
 ## Never put a secret in the client bundle
 
@@ -201,10 +160,6 @@ the row's id. (Reordering modules used to drop the half-typed lesson title.)
 
 The diff is smaller when the next line is added.
 
-## Write the test before the fix
-
-Otherwise you do not know the fix worked.
-
 ## Soft-delete anything a person can point at
 
 If another row references it, or a person has a link to it, do not delete it.
@@ -215,12 +170,6 @@ learners' notes and bookmarks with it.
 
 `request`, not `req`. `error`, not `e`. The only exceptions are `id` and `url`,
 which are longer written out.
-
-## Colour is never the only signal
-
-## Mobile first
-
-Write the small-screen rule, then widen it.
 
 ## Do not catch an error only to re-throw it unchanged
 
@@ -235,25 +184,11 @@ the table. Name the columns.
 
 ## never log a secret
 
-## Hoist a constant out of the body
-
-A value that does not depend on anything in the body goes outside the body,
-so it is built once instead of on every pass.
-
 ## Double quotes for strings
 
 Single quotes only inside a double-quoted string.
 
 ## The branch name matches the ticket
-
-## Validate at the edge, trust inside
-
-Parse once, at the boundary. After that the value has a type and you do not
-check it again.
-
-## Keep the fixture close to the test
-
-A shared fixture that every test bends is worse than a little duplication.
 
 ## Use semantic elements
 
@@ -263,17 +198,6 @@ A `div` with an `onClick` is a button that nobody can tab to.
 
 A foreign key without an index is a table scan on every join. Add the index
 in the same change that adds the key.
-
-## Name a function for what it returns, not how it works
-
-`getPendingRefunds`, not `queryRefundsTableFilteredByStatus`.
-
-## Measure before you optimise
-
-## Never mutate a value you were handed
-
-Take a copy, change the copy, hand the copy back. A caller that passed you
-something does not expect to find it different afterwards.
 
 ### No trailing whitespace
 
@@ -285,7 +209,6 @@ Strip it before you commit.
 - Do not set a positive `tabIndex`.
 - Squash before landing.
 - Throw `Error`, never a string.
-- Do not test the framework.
 - Strings go in double quotes, please — not single.
 
 ## Inject the clock
@@ -321,24 +244,14 @@ Everything else is a named export.
 
 The stack is the useful part.
 
-## Lazy-load anything below the fold
-
 ### Component props are a `type`
 
 Write `type Props = { … }`, not `interface Props`.
-
-## One assertion per test, where you can manage it
-
-A test that fails should tell you what is broken without being read.
 
 ## Never build a query by joining strings
 
 Parameterise. String concatenation is how injection gets in, and it is also
 how a quote in somebody's name takes the page down.
-
-## Return early rather than nesting
-
-A guard clause at the top beats an `else` at the bottom.
 
 ## No inline styles except for a computed value
 
@@ -360,15 +273,6 @@ files and `"Pending"` in one.
 
 Past three, take an object.
 
-## Do not remove the focus ring
-
-Restyle it if you must, but leave something visible.
-
-## Split a component when it grows a second reason to change
-
-A component that both fetches and lays out is two components. Pull the layout
-out and pass it what it needs.
-
 ## Prefer arrow functions for callbacks
 
 `items.map((item) => item.id)`, not `items.map(function (item) { … })`.
@@ -380,10 +284,6 @@ out and pass it what it needs.
 We got bitten by this in the notes loader: one query per lesson, forty lessons
 per course.
 
-## Do not export something only one file uses
-
-Keep it private until a second caller appears.
-
 ## Keep the heading levels in order
 
 ## Rebase, do not merge, before you open a pull request
@@ -394,26 +294,11 @@ Keep it private until a second caller appears.
 
 ## Set `rel="noopener noreferrer"` on every external link
 
-## Do not use a default parameter to hide a required one
-
-If the caller must always pass it, make them.
-
-## Do not mock what you own
-
 ## No TODO without a name and a date
 
 `// TODO(matt, 2026-03-01): …`. A TODO with nobody's name on it is a wish.
 
-## Debounce anything that fires on keystroke
-
-## Prefer a pure function
-
-If it can be written without reading the clock, the database or the network,
-write it that way. It is the only kind of function that is pleasant to test.
-
 ## Do not commit generated files
-
-## Assert an invariant rather than commenting it
 
 ## Do not nest more than three levels
 
