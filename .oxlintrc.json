@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "react", "jsx-a11y", "import", "vitest"],
+  "jsPlugins": ["./oxlint-plugins/sql-safety.ts"],
   "categories": {
     "correctness": "error"
   },
@@ -25,6 +26,7 @@
         "null": "ignore"
       }
     ],
+    "sql-safety/no-dynamic-sql-raw": "error",
     "no-var": "error",
     "prefer-const": "error",
     "no-console": [
@@ -92,6 +94,7 @@
         "app/routes/**",
         "app/root.tsx",
         "app/routes.ts",
+        "oxlint-plugins/*.ts",
         "*.config.*",
         "*.conf.*"
       ],
