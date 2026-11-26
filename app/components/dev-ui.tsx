@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form, useLocation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -49,7 +49,37 @@ export function DevUI({
 }: DevUIProps) {
   const [minimized, setMinimized] = useState(false);
   const [open, setOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  // The panel floats over every page, so the list must close itself on outside
+  // presses and Escape rather than waiting for the toggle button to be clicked.
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const switcher = switcherRef.current;
+      if (
+        switcher &&
+        event.target instanceof Node &&
+        !switcher.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   if (minimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
@@ -96,11 +126,12 @@ export function DevUI({
           </div>
         )}
 
-        <div className="relative">
+        <div ref={switcherRef} className="relative">
           <Button
             size="sm"
             variant="outline"
             className="w-full justify-between"
+            aria-expanded={open}
             onClick={() => setOpen(!open)}
           >
             Switch user
@@ -119,6 +150,7 @@ export function DevUI({
                   key={user.id}
                   method="post"
                   action={`/api/switch-user?redirectTo=${encodeURIComponent(location.pathname + location.search)}`}
+                  onSubmit={() => setOpen(false)}
                 >
                   <input type="hidden" name="userId" value={user.id} />
                   <button
