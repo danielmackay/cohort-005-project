@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form, useLocation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -50,6 +50,36 @@ export function DevUI({
   const [minimized, setMinimized] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const switcherRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // pointerdown rather than click, so the list closes before focus moves to
+    // whatever was pressed, matching how native menus dismiss.
+    function handlePointerDown(event: PointerEvent) {
+      const switcher = switcherRef.current;
+      if (
+        switcher &&
+        event.target instanceof Node &&
+        !switcher.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   if (minimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
@@ -96,7 +126,7 @@ export function DevUI({
           </div>
         )}
 
-        <div className="relative">
+        <div ref={switcherRef} className="relative">
           <Button
             size="sm"
             variant="outline"
@@ -119,6 +149,9 @@ export function DevUI({
                   key={user.id}
                   method="post"
                   action={`/api/switch-user?redirectTo=${encodeURIComponent(location.pathname + location.search)}`}
+                  // The switch is a same-page redirect, so DevUI never remounts
+                  // and would otherwise keep the list open after choosing.
+                  onSubmit={() => setOpen(false)}
                 >
                   <input type="hidden" name="userId" value={user.id} />
                   <button
