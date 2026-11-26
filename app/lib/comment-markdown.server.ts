@@ -12,7 +12,8 @@ import type { Markdown } from "~/lib/text";
 //
 // This renderer never emits author-supplied HTML:
 //   - raw HTML blocks/tags are escaped and shown as literal text
-//   - link hrefs are restricted to http/https/mailto and get rel="nofollow"
+//   - link hrefs are restricted to same-origin paths and http/https/mailto,
+//     and get rel="nofollow"
 //   - images are dropped (rendered as their alt text)
 //   - everything else goes through marked's own escaping
 // Output is still injected with dangerouslySetInnerHTML, so any change here
@@ -66,6 +67,11 @@ function safeHref(href: string | null): string | null {
   if (!href) return null;
 
   const trimmed = href.trim();
+
+  // Relative links stay on our own origin, so they're safe.
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return trimmed;
+  }
 
   try {
     const url = new URL(trimmed);

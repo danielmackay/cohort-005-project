@@ -106,6 +106,15 @@ describe("renderComment", () => {
       expect(html).toContain('target="_blank"');
     });
 
+    it("keeps relative links", async () => {
+      const html = await renderComment(
+        markdown("[lesson](/courses/x/lessons/1)")
+      );
+
+      expect(html).toContain('<a href="/courses/x/lessons/1"');
+      expect(html).toContain('rel="nofollow noopener noreferrer"');
+    });
+
     it("downgrades a javascript: link to plain text", async () => {
       const html = await renderComment(
         markdown("[click](javascript:alert(1))")
