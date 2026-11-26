@@ -94,6 +94,20 @@ module.exports = {
       from: { path: "^app/routes/instructor\\.analytics\\.tsx$" },
       to: { path: ["^app/db/", "^node_modules/(drizzle-orm|better-sqlite3)/"] },
     },
+    {
+      name: "components-no-db-driver",
+      comment:
+        "Components ship to the browser, where better-sqlite3 throws on import and aborts hydration for the whole app. Get data through a route loader. app/db/schema.ts stays allowed: its drizzle table builders and enums are browser-safe.",
+      severity: "error",
+      from: { path: "^app/components/" },
+      to: {
+        path: [
+          "^app/db/index\\.ts$",
+          "^node_modules/better-sqlite3/",
+          "^node_modules/drizzle-orm/better-sqlite3/",
+        ],
+      },
+    },
   ],
   options: {
     doNotFollow: { path: "node_modules" },
