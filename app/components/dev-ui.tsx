@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form, useLocation } from "react-router";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
@@ -49,7 +49,34 @@ export function DevUI({
 }: DevUIProps) {
   const [minimized, setMinimized] = useState(false);
   const [open, setOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  // The list is a hand-rolled popover, so it needs its own dismissal: a click
+  // anywhere outside the switcher, or Escape, closes it.
+  useEffect(() => {
+    if (!open) return;
+    function handlePointerDown(event: PointerEvent) {
+      const switcher = switcherRef.current;
+      if (
+        switcher &&
+        event.target instanceof Node &&
+        !switcher.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   if (minimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
@@ -96,12 +123,12 @@ export function DevUI({
           </div>
         )}
 
-        <div className="relative">
+        <div ref={switcherRef} className="relative">
           <Button
             size="sm"
             variant="outline"
             className="w-full justify-between"
-            onClick={() => setOpen(!open)}
+            onClick={() => setOpen((wasOpen) => !wasOpen)}
           >
             Switch user
             <ChevronDown
@@ -119,6 +146,9 @@ export function DevUI({
                   key={user.id}
                   method="post"
                   action={`/api/switch-user?redirectTo=${encodeURIComponent(location.pathname + location.search)}`}
+                  // The submission is a client-side navigation that keeps DevUI
+                  // mounted, so `open` would otherwise survive the switch.
+                  onSubmit={() => setOpen(false)}
                 >
                   <input type="hidden" name="userId" value={user.id} />
                   <button
