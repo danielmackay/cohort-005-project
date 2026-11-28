@@ -165,7 +165,7 @@ export function FullLesson({
           )}
 
           {/* Note — under the video, so the Student can write while they watch */}
-          {currentUserId && <LessonNote note={note} />}
+          {currentUserId && <LessonNote key={lesson.id} note={note} />}
 
           {/* Lesson Content */}
           {contentHtml && (
