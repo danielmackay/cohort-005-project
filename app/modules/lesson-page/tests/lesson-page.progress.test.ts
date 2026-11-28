@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { LessonProgressStatus } from "~/db/schema";
-import { addLesson, addModule, addWatchEvent, setUp } from "./fixtures";
+import {
+  addComment,
+  addLesson,
+  addModule,
+  addWatchEvent,
+  setUp,
+} from "./fixtures";
 
 describe("getCourseWithDetails", () => {
   it("is null for an unknown course", () => {
@@ -143,5 +149,20 @@ describe("watching", () => {
 
     expect(page.calculateWatchProgress(user.id, lesson.id, 600)).toBe(100);
     expect(page.calculateWatchProgress(user.id, lesson.id, 0)).toBe(0);
+  });
+});
+
+describe("lookups by id", () => {
+  it("finds a lesson, module, user and comment, and nothing for unknown ids", () => {
+    const { db, page, course, user } = setUp();
+    const mod = addModule(db, course.id, 1);
+    const lesson = addLesson(db, mod.id, 1);
+    const comment = addComment(db, { lessonId: lesson.id, userId: user.id });
+
+    expect(page.getLessonById(lesson.id)?.moduleId).toBe(mod.id);
+    expect(page.getModuleById(mod.id)?.courseId).toBe(course.id);
+    expect(page.getUserById(user.id)?.name).toBe(user.name);
+    expect(page.getCommentById(comment.id)?.userId).toBe(user.id);
+    expect(page.getLessonById(999)).toBeUndefined();
   });
 });
