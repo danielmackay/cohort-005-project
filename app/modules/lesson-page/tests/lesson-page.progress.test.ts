@@ -8,6 +8,8 @@ import {
   setUp,
 } from "./fixtures";
 
+const NOW = new Date("2026-03-04T05:06:07.000Z");
+
 describe("getCourseWithDetails", () => {
   it("is null for an unknown course", () => {
     const { page } = setUp();
@@ -53,10 +55,10 @@ describe("lesson progress", () => {
     const { db, page, course, user } = setUp();
     const lesson = addLesson(db, addModule(db, course.id, 1).id, 1);
 
-    const progress = page.markLessonComplete(user.id, lesson.id);
+    const progress = page.markLessonComplete(user.id, lesson.id, NOW);
 
     expect(progress.status).toBe(LessonProgressStatus.Completed);
-    expect(progress.completedAt).not.toBeNull();
+    expect(progress.completedAt).toBe(NOW.toISOString());
   });
 
   it("completes a lesson that was in progress, keeping one row", () => {
@@ -64,7 +66,7 @@ describe("lesson progress", () => {
     const lesson = addLesson(db, addModule(db, course.id, 1).id, 1);
     const started = page.markLessonInProgress(user.id, lesson.id);
 
-    const completed = page.markLessonComplete(user.id, lesson.id);
+    const completed = page.markLessonComplete(user.id, lesson.id, NOW);
 
     expect(completed.id).toBe(started.id);
     expect(completed.status).toBe(LessonProgressStatus.Completed);
@@ -73,7 +75,7 @@ describe("lesson progress", () => {
   it("never moves a completed lesson back to in progress", () => {
     const { db, page, course, user } = setUp();
     const lesson = addLesson(db, addModule(db, course.id, 1).id, 1);
-    page.markLessonComplete(user.id, lesson.id);
+    page.markLessonComplete(user.id, lesson.id, NOW);
 
     const after = page.markLessonInProgress(user.id, lesson.id);
 
@@ -96,9 +98,9 @@ describe("lesson progress", () => {
     const mod = addModule(db, course.id, 1);
     const a = addLesson(db, mod.id, 1);
     const b = addLesson(db, mod.id, 2);
-    page.markLessonComplete(user.id, a.id);
+    page.markLessonComplete(user.id, a.id, NOW);
     page.markLessonInProgress(user.id, b.id);
-    page.markLessonComplete(instructor.id, a.id);
+    page.markLessonComplete(instructor.id, a.id, NOW);
 
     const rows = page.getLessonProgressForCourse(user.id, course.id);
 

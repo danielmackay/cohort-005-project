@@ -41,8 +41,8 @@ export function createLessonPage(database: Db) {
       getLessonProgress(database, userId, lessonId),
     getLessonProgressForCourse: (userId: Id, courseId: Id) =>
       getLessonProgressForCourse(database, userId, courseId),
-    markLessonComplete: (userId: Id, lessonId: Id) =>
-      markLessonComplete(database, userId, lessonId),
+    markLessonComplete: (userId: Id, lessonId: Id, now: Date) =>
+      markLessonComplete(database, { userId, lessonId, now }),
     markLessonInProgress: (userId: Id, lessonId: Id) =>
       markLessonInProgress(database, userId, lessonId),
     getLastWatchPosition: (userId: Id, lessonId: Id) =>
