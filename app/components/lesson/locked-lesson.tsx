@@ -7,9 +7,7 @@ import {
   CurriculumSidebar,
   LessonBreadcrumb,
 } from "~/components/lesson/lesson-chrome";
-import type { Route } from "../../routes/+types/courses.$slug.lessons.$lessonId";
-
-export type LessonLoaderData = Route.ComponentProps["loaderData"];
+import type { LessonLoaderData } from "~/components/lesson/full-lesson";
 
 export function LockedLesson({
   data: { course, curriculum, module: mod, lesson, enrolled, lockedReason },
