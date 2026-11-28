@@ -42,4 +42,20 @@ describe("noteDraft", () => {
     expect(draft.tooLong).toBe(true);
     expect(draft.canSave).toBe(false);
   });
+
+  it("treats text that differs from the saved Note only by surrounding whitespace as saved", () => {
+    const draft = noteDraft("saved thought  \n", "saved thought");
+    expect(draft.unsaved).toBe(false);
+    expect(draft.canSave).toBe(false);
+  });
+
+  it("treats CRLF and LF line breaks as the same text", () => {
+    expect(
+      noteDraft("line one\nline two", "line one\r\nline two").unsaved
+    ).toBe(false);
+  });
+
+  it("does not count surrounding whitespace, which the server trims", () => {
+    expect(noteDraft("  hello  ", "").length).toBe(5);
+  });
 });
