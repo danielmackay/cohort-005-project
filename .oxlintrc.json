@@ -149,6 +149,10 @@
       "files": [
         "app/components/comment-thread.tsx",
         "app/components/dev-ui.tsx",
+        "app/components/lesson/full-lesson.tsx",
+        "app/components/lesson/lesson-chrome.tsx",
+        "app/components/lesson/locked-lesson.tsx",
+        "app/components/lesson/quiz-section.tsx",
         "app/components/monaco-markdown-editor.tsx",
         "app/components/notification-feed.tsx",
         "app/components/sidebar.tsx",
@@ -162,6 +166,7 @@
         "app/lib/refunds.server.ts",
         "app/lib/seat-claims.server.ts",
         "app/modules/instructor-analytics/lib/instructor-analytics.ts",
+        "app/modules/lesson-page/lib/queries.ts",
         "app/routes/admin.categories.tsx",
         "app/routes/admin.courses.tsx",
         "app/routes/admin.refunds.tsx",

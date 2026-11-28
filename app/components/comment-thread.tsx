@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import { toast } from "sonner";
 import { MessageSquare, Pencil, Reply, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
+import { LessonSection } from "~/components/lesson-section";
 import { Textarea } from "~/components/ui/textarea";
 import { UserAvatar } from "~/components/user-avatar";
 import { cn, formatRelativeTime } from "~/lib/utils";
@@ -365,46 +365,39 @@ export function CommentThread({
   instructorName: string;
 }) {
   return (
-    <Card className="mb-8">
-      <CardContent className="p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <MessageSquare className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold">Questions &amp; Discussion</h2>
+    <LessonSection icon={MessageSquare} title="Questions & Discussion">
+      {comments.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-6 text-center">
+          <p className="font-medium">Stuck on this lesson?</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ask here — {instructorName} answers questions in this course.
+            There&apos;s no such thing as a question that&apos;s too basic.
+          </p>
         </div>
-
-        {comments.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center">
-            <p className="font-medium">Stuck on this lesson?</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ask here — {instructorName} answers questions in this course.
-              There&apos;s no such thing as a question that&apos;s too basic.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y">
-            {comments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                currentUserId={currentUserId}
-                canModerate={canModerate}
-                canPost={canPost}
-                isReply={false}
-              />
-            ))}
-          </div>
-        )}
-
-        {canPost && (
-          <div className="mt-6 border-t pt-6">
-            <CommentForm
-              intent="create-comment"
-              placeholder="Ask a question or share what you found..."
-              submitLabel="Post comment"
+      ) : (
+        <div className="divide-y">
+          {comments.map((comment) => (
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              currentUserId={currentUserId}
+              canModerate={canModerate}
+              canPost={canPost}
+              isReply={false}
             />
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          ))}
+        </div>
+      )}
+
+      {canPost && (
+        <div className="mt-6 border-t pt-6">
+          <CommentForm
+            intent="create-comment"
+            placeholder="Ask a question or share what you found..."
+            submitLabel="Post comment"
+          />
+        </div>
+      )}
+    </LessonSection>
   );
 }
